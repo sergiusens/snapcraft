@@ -25,9 +25,6 @@ For more information check the 'plugins' topic for the former and the
 
 Additionally, this plugin uses the following plugin-specific keywords:
 
-    - node-packages:
-      (list)
-      A list of dependencies to fetch using npm.
     - node-engine:
       (string)
       The version of nodejs you want the snap to run on.
@@ -52,7 +49,7 @@ import sys
 
 import snapcraft
 from snapcraft import sources
-from snapcraft.file_utils import link_or_copy_tree
+from snapcraft.file_utils import link_or_copy_tree, link_or_copy
 from snapcraft.internal import errors
 
 logger = logging.getLogger(__name__)
@@ -75,15 +72,6 @@ class NodePlugin(snapcraft.BasePlugin):
     def schema(cls):
         schema = super().schema()
 
-        schema['properties']['node-packages'] = {
-            'type': 'array',
-            'minitems': 1,
-            'uniqueItems': True,
-            'items': {
-                'type': 'string'
-            },
-            'default': []
-        }
         schema['properties']['node-engine'] = {
             'type': 'string',
             'default': _NODEJS_VERSION
@@ -112,7 +100,7 @@ class NodePlugin(snapcraft.BasePlugin):
     def get_build_properties(cls):
         # Inform Snapcraft of the properties associated with building. If these
         # change in the YAML Snapcraft will consider the build step dirty.
-        return ['node-packages', 'npm-run']
+        return ['npm-run']
 
     @classmethod
     def get_pull_properties(cls):
@@ -122,8 +110,6 @@ class NodePlugin(snapcraft.BasePlugin):
 
     def __init__(self, name, options, project):
         super().__init__(name, options, project)
-        self._source_package_json = os.path.join(
-            os.path.abspath(self.options.source), 'package.json')
         self._npm_dir = os.path.join(self.partdir, 'npm')
         self._nodejs_tar = sources.Tar(get_nodejs_release(
             self.options.node_engine, self.project.deb_arch), self._npm_dir)
@@ -140,10 +126,7 @@ class NodePlugin(snapcraft.BasePlugin):
         if hasattr(self, '_yarn_tar'):
             self._yarn_tar.download()
         # do the install in the pull phase to download all dependencies.
-        if self.options.node_package_manager == 'npm':
-            self._npm_install(rootdir=self.sourcedir)
-        else:
-            self._yarn_install(rootdir=self.sourcedir)
+        self._install(rootdir=self.sourcedir)
 
     def clean_pull(self):
         super().clean_pull()
@@ -154,82 +137,84 @@ class NodePlugin(snapcraft.BasePlugin):
 
     def build(self):
         super().build()
-        if self.options.node_package_manager == 'npm':
-            installed_node_packages = self._npm_install(rootdir=self.builddir)
-            # Copy the content of the symlink to the build directory
-            # LP: #1702661
-            modules_dir = os.path.join(self.installdir, 'lib', 'node_modules')
-            _copy_symlinked_content(modules_dir)
-        else:
-            installed_node_packages = self._yarn_install(rootdir=self.builddir)
-            lock_file_path = os.path.join(self.sourcedir, 'yarn.lock')
-            if os.path.isfile(lock_file_path):
-                with open(lock_file_path) as lock_file:
-                    self._manifest['yarn-lock-contents'] = lock_file.read()
+        installed_node_packages = self._install(rootdir=self.builddir)
+        lock_file_path = os.path.join(self.sourcedir, 'yarn.lock')
+
+        if os.path.isfile(lock_file_path):
+            with open(lock_file_path) as lock_file:
+                self._manifest['yarn-lock-contents'] = lock_file.read()
 
         self._manifest['node-packages'] = [
             '{}={}'.format(name, installed_node_packages[name])
             for name in installed_node_packages
         ]
 
-    def _npm_install(self, rootdir):
+    def _install(self, rootdir):
         self._nodejs_tar.provision(
-            self.installdir, clean_target=False, keep_tarball=True)
-        npm_install = ['npm', '--cache-min=Infinity', 'install']
-        for pkg in self.options.node_packages:
-            self.run(npm_install + ['--global'] + [pkg], cwd=rootdir)
-        if os.path.exists(os.path.join(rootdir, 'package.json')):
-            self.run(npm_install, cwd=rootdir)
-            self.run(npm_install + ['--global'], cwd=rootdir)
-        for target in self.options.npm_run:
-            self.run(['npm', 'run', target], cwd=rootdir)
-        return self._get_installed_node_packages('npm', self.installdir)
-
-    def _yarn_install(self, rootdir):
-        self._nodejs_tar.provision(
-            self.installdir, clean_target=False, keep_tarball=True)
+            self._npm_dir, clean_target=False, keep_tarball=True)
         self._yarn_tar.provision(
             self._npm_dir, clean_target=False, keep_tarball=True)
-        yarn_cmd = [os.path.join(self._npm_dir, 'bin', 'yarn')]
+        cmd = [os.path.join(self._npm_dir, 'bin',
+               self.options.node_package_manager)]
+        npm_cmd = [os.path.join(self._npm_dir, 'bin', 'npm')]
+
         flags = []
         if rootdir == self.builddir:
-            yarn_add = yarn_cmd + ['global', 'add']
-            flags.extend([
-                '--offline', '--prod',
-                '--global-folder', self.installdir,
-                '--prefix', self.installdir,
-            ])
-        else:
-            yarn_add = yarn_cmd + ['add']
-        for pkg in self.options.node_packages:
-            self.run(yarn_add + [pkg] + flags, cwd=rootdir)
+            flags = ['--offline', '--prod']
 
-        # local packages need to be added as if they were remote, we
-        # remove the local package.json so `yarn add` doesn't pollute it.
-        if os.path.exists(self._source_package_json):
-            with contextlib.suppress(FileNotFoundError):
-                os.unlink(os.path.join(rootdir, 'package.json'))
-            shutil.copy(self._source_package_json,
-                        os.path.join(rootdir, 'package.json'))
-            self.run(yarn_add + ['file:{}'.format(rootdir)] + flags,
-                     cwd=rootdir)
+        self.run(cmd + ['install'] + flags, rootdir)
+        # We run npm regardless of node-package-manager being yarn
+        # as yarn isn't doing the right thing.
+        self.run(npm_cmd + ['pack'], rootdir)
 
-        # npm run would require to bring back package.json
-        if self.options.npm_run and os.path.exists(self._source_package_json):
-            # The current package.json is the yarn prefilled one.
-            with contextlib.suppress(FileNotFoundError):
-                os.unlink(os.path.join(rootdir, 'package.json'))
-            os.link(self._source_package_json,
-                    os.path.join(rootdir, 'package.json'))
+        # npm pack will create a tarball of the form
+        # <package-name>-<package-version>.tgz
+        package_json = self._get_package_json(rootdir)
+        package_tar_path = '{name}-{version}.tgz'.format(**package_json)
+
+        package_dir = os.path.join(rootdir, 'package')
+        package_tar = sources.Tar(package_tar_path, rootdir)
+        package_tar.file = package_tar_path
+        os.makedirs(package_dir, exist_ok=True)
+        package_tar.provision(package_dir)
+
+        # TODO make sure we add support for npm lock files.
+        with contextlib.suppress(FileNotFoundError):
+            shutil.copy(os.path.join(rootdir, 'yarn.lock'),
+                        os.path.join(package_dir, 'yarn.lock'))
+
+        self.run(cmd + ['install'] + flags, package_dir)
+
+        _create_bins(package_json, package_dir)
+
         for target in self.options.npm_run:
-            self.run(yarn_cmd + ['run', target], cwd=rootdir,
-                     env=self._build_environment(rootdir))
-        return self._get_installed_node_packages('npm', self.installdir)
+            self.run(cmd + ['run', target], rootdir)
+
+        dependencies = {}
+        if rootdir == self.builddir:
+            link_or_copy_tree(package_dir, self.installdir)
+            dependencies = self._get_installed_node_packages(
+                npm_cmd, self.installdir)
+            link_or_copy(os.path.join(self._npm_dir, 'bin', 'node'),
+                         os.path.join(self.installdir, 'bin', 'node'))
+
+        return dependencies
+
+    def run(self, cmd, rootdir):
+        super().run(cmd, env=self._build_environment(), cwd=rootdir)
+
+    def run_output(self, cmd, rootdir):
+        return super().run_output(cmd, env=self._build_environment(),
+                                  cwd=rootdir)
+
+    def _get_package_json(self, rootdir):
+        with open(os.path.join(rootdir, 'package.json')) as json_file:
+            return json.load(json_file)
 
     def _get_installed_node_packages(self, package_manager, cwd):
+        cmd = package_manager + ['ls', '--global', '--json']
         try:
-            output = self.run_output(
-                [package_manager, 'ls', '--global', '--json'], cwd=cwd)
+            output = self.run_output(cmd, cwd)
         except subprocess.CalledProcessError as error:
             # XXX When dependencies have missing dependencies, an error like
             # this is printed to stderr:
@@ -237,8 +222,9 @@ class NodePlugin(snapcraft.BasePlugin):
             # retcode is not 0, which raises an exception.
             output = error.output.decode(sys.getfilesystemencoding()).strip()
         packages = collections.OrderedDict()
-        dependencies = json.loads(
-            output, object_pairs_hook=collections.OrderedDict)['dependencies']
+        output_json = json.loads(
+            output, object_pairs_hook=collections.OrderedDict)
+        dependencies = output_json['dependencies']
         while dependencies:
             key, value = dependencies.popitem(last=False)
             # XXX Just as above, dependencies without version are the ones
@@ -252,16 +238,34 @@ class NodePlugin(snapcraft.BasePlugin):
     def get_manifest(self):
         return self._manifest
 
-    def _build_environment(self, rootdir):
+    def _build_environment(self):
         env = os.environ.copy()
-        if rootdir.endswith('src'):
-            hidden_path = os.path.join(rootdir, 'node_modules', '.bin')
-            if env.get('PATH'):
-                new_path = '{}:{}'.format(hidden_path, env.get('PATH'))
-            else:
-                new_path = hidden_path
-            env['PATH'] = new_path
+        npm_bin = os.path.join(self._npm_dir, 'bin')
+        if env.get('PATH'):
+            new_path = '{}:{}'.format(npm_bin, env.get('PATH'))
+        else:
+            new_path = npm_bin
+        env['PATH'] = new_path
         return env
+
+
+def _create_bins(package_json, directory):
+    binaries = package_json.get('bin')
+    if not binaries:
+        return
+
+    bin_dir = os.path.join(directory, 'bin')
+    os.makedirs(bin_dir, exist_ok=True)
+
+    if type(binaries) == dict:
+        for bin_name, bin_path in binaries.items():
+            link_target = os.path.join(bin_dir, bin_name)
+            link_source = os.path.join('..', bin_path)
+            os.symlink(link_source, link_target)
+    else:
+        raise NotImplementedError(
+            'The plugin is not prepared to handle bin entries of '
+            'type {!r}'.format(type(binaries)))
 
 
 def _get_nodejs_base(node_engine, machine):
@@ -275,25 +279,3 @@ def _get_nodejs_base(node_engine, machine):
 def get_nodejs_release(node_engine, arch):
     return _NODEJS_TMPL.format(version=node_engine,
                                base=_get_nodejs_base(node_engine, arch))
-
-
-def _copy_symlinked_content(modules_dir):
-    """Copy symlinked content.
-
-    When running newer versions of npm, symlinks to the local tree are
-    created from the part's installdir to the root of the builddir of the
-    part (this only affects some build configurations in some projects)
-    which is valid when running from the context of the part but invalid
-    as soon as the artifacts migrate across the steps,
-    i.e.; stage and prime.
-
-    If modules_dir does not exist we simply return.
-    """
-    if not os.path.exists(modules_dir):
-        return
-    modules = [os.path.join(modules_dir, d) for d in os.listdir(modules_dir)]
-    symlinks = [l for l in modules if os.path.islink(l)]
-    for link_path in symlinks:
-        link_target = os.path.realpath(link_path)
-        os.unlink(link_path)
-        link_or_copy_tree(link_target, link_path)
