@@ -19,7 +19,7 @@ import subprocess
 import shutil
 from textwrap import dedent
 
-from testtools.matchers import Contains, Equals, FileExists
+from testtools.matchers import Equals, FileExists
 
 from tests import integration
 
@@ -159,9 +159,5 @@ class GitGenerateVersionTestCase(integration.GitSourceBaseTestCase):
     def test_no_git(self):
         shutil.rmtree('.git')
 
-        exception = self.assertRaises(
+        self.assertRaises(
             subprocess.CalledProcessError, self.run_snapcraft, ['snap'])
-        self.assertThat(
-            exception.output,
-            Contains('fatal: Not a git repository (or any of the parent '
-                     'directories): .git'))

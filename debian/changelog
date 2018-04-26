@@ -1,4 +1,4 @@
-snapcraft (2.42) xenial; urgency=medium
+snapcraft (2.42+18.04) bionic; urgency=medium
 
   [ Sergio Schvezov ]
   * elf: patch everything instead of a subset of elf files (#2081)
@@ -43,6 +43,13 @@ snapcraft (2.42) xenial; urgency=medium
     required (#2086)
 
  -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Thu, 26 Apr 2018 01:58:29 +0000
+
+snapcraft (2.41+18.04.2) bionic; urgency=medium
+
+  * debian/control
+    - Depend on python3-distutils, required on bionic
+
+ -- Ken VanDine <ken.vandine@canonical.com>  Wed, 18 Apr 2018 10:37:19 -0400
 
 snapcraft (2.41) xenial; urgency=medium
 
