@@ -70,6 +70,11 @@ class Provider():
         """Provider steps needed to copy project assests to the instance."""
 
     @abc.abstractmethod
+    def mount_project(self) -> None:
+        """Provider steps needed to make the project available to the instance.
+        """
+
+    @abc.abstractmethod
     def build_project(self) -> None:
         """Provider steps needed build the project on the instance."""
 
@@ -92,3 +97,9 @@ class Provider():
             self.instance_name))
         install_cmd = ['sudo', 'snap', 'install', 'snapcraft', '--classic']
         self._run(install_cmd)
+
+    def refresh_snapcraft(self) -> None:
+        self.echoer.info('Refreshing snapcraft in {!r}'.format(
+            self.instance_name))
+        refresh_cmd = ['sudo', 'snap', 'refresh', 'snapcraft']
+        self._run(refresh_cmd)

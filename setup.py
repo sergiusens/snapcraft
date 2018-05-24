@@ -37,6 +37,7 @@ packages = [
     'snapcraft.internal.cache',
     'snapcraft.internal.build_providers',
     'snapcraft.internal.build_providers._multipass',
+    'snapcraft.internal.build_providers._qemu',
     'snapcraft.internal.deltas',
     'snapcraft.internal.lifecycle',
     'snapcraft.internal.lxd',

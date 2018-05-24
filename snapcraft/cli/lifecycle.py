@@ -17,20 +17,28 @@
 import click
 import os
 
-from snapcraft.internal import deprecations, lifecycle, lxd, project_loader
+from snapcraft.internal import (build_providers, deprecations, lifecycle, lxd,
+                                project_loader)
 from ._options import add_build_options, get_project_options
 from . import echo
 from . import env
 
 
 def _execute(command, parts, **kwargs):
-    project_options = get_project_options(**kwargs)
+    project = get_project_options(**kwargs)
     build_environment = env.BuilderEnvironmentConfig()
-    if build_environment.is_host:
-        lifecycle.execute(command, project_options, parts)
+    config = project_loader.load_config(project)
+
+    if config.data.get('base'):
+        build_provider_class = build_providers.get_provider_for('qemu')
+        with build_provider_class(project=project, echoer=echo) as instance:
+            instance.mount_project()
+            instance.build_project()
+    elif build_environment.is_host:
+        lifecycle.execute(command, project, parts)
     else:
-        lifecycle.containerbuild(command, project_options, parts)
-    return project_options
+        lifecycle.containerbuild(command, project, parts)
+    return project
 
 
 @click.group()
