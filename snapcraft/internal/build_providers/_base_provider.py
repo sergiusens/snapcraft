@@ -23,13 +23,16 @@ import petname
 
 class Provider():
 
-    def __init__(self, *, project, echoer) -> None:
+    def __init__(self, *, project, echoer, instance_name: str=None) -> None:
         self.project = project
         self.echoer = echoer
         # Once https://github.com/CanonicalLtd/multipass/issues/220 is
         # closed we can prepend snapcraft- again.
-        self.instance_name = petname.Generate(2, '-')
-        self.project_dir = shlex.quote(project.info.name)
+        if instance_name is None:
+            self.instance_name = petname.Generate(2, '-')
+        else:
+            self.instance_name = 'snapcraft-{}'.format(project.info.name)
+        self.project_dir = shlex.quote(self.instance_name)
 
         if project.info.version:
             self.snap_filename = '{}_{}_{}.snap'.format(
@@ -99,7 +102,10 @@ class Provider():
         self._run(install_cmd)
 
     def refresh_snapcraft(self) -> None:
+        self.echoer.info('Waiting for pending snap auto refreshes.')
+        self._run(['sudo', 'snap', 'watch', '--last=auto-refresh'])
         self.echoer.info('Refreshing snapcraft in {!r}'.format(
             self.instance_name))
-        refresh_cmd = ['sudo', 'snap', 'refresh', 'snapcraft']
+        refresh_cmd = ['sudo', 'snap', 'refresh', 'snapcraft',
+                       '--channel', 'edge/bases']
         self._run(refresh_cmd)

@@ -158,7 +158,7 @@ class QemuDriver:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = None
         while result != 0:
-            sleep(20)
+            sleep(60)
             result = sock.connect_ex(('localhost', self.ssh_port))
             logger.debug('Pinging for ssh availability: port check {}'.format(
                 result))

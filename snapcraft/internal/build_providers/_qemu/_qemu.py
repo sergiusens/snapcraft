@@ -35,7 +35,7 @@ class Qemu(Provider):
         cloud_img = self._create_cloud_img()
         self._qemu_driver.launch(
             hda=hda_img, qcow2_drives=[cloud_img], ram='1024',
-            project_9p_dev='/home/sergiusens/source/test-project')
+            project_9p_dev=os.path.abspath('.'))
 
     def __init__(self, *, project, echoer) -> None:
         super().__init__(project=project, echoer=echoer)
@@ -49,7 +49,7 @@ class Qemu(Provider):
 
     def destroy(self) -> None:
         """Destroy the instance, trying to stop it first."""
-        pass
+        self._qemu_driver.stop(instance_name=self.instance_name)
 
     def mount_project(self) -> None:
         self._qemu_driver.execute(command=[
@@ -62,7 +62,7 @@ class Qemu(Provider):
         # TODO add instance check.
         # Use the full path as /snap/bin is not in PATH.
         snapcraft_cmd = 'cd /{}; /snap/bin/snapcraft'.format(self.project_dir)
-        self._qemu_driver.execute(command=['sh', '-c', snapcraft_cmd])
+        self._qemu_driver.execute(command=['sudo', 'sh', '-c', snapcraft_cmd])
 
     def _get_developer_vm_for_base(self, base: str) -> str:
         # TODO implement correctly

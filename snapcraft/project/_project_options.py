@@ -260,7 +260,10 @@ class ProjectOptions:
             logger.debug('Running on {!r}'.format(codename))
 
         build_host_for_base = _HOST_CODENAME_FOR_BASE.get(
-            base)  # type: str
+            base, None)  # type: str
+        # TODO: better support for build VMs might be required.
+        if build_host_for_base is None:
+            return True
         compatible_hosts = _HOST_COMPATIBILITY.get(
             build_host_for_base, [])  # type: List[str]
         return codename in compatible_hosts

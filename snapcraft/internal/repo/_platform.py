@@ -30,7 +30,7 @@ _DEB_BASED_PLATFORM = [
 ]
 
 
-def _is_deb_based(distro=None):
+def _is_deb_based(distro=None) -> bool:
     if not distro:
         try:
             distro = OsRelease().id()
@@ -39,10 +39,22 @@ def _is_deb_based(distro=None):
     return distro in _DEB_BASED_PLATFORM
 
 
+def _is_dnf_based(distro=None) -> bool:
+    if not distro:
+        try:
+            distro = OsRelease().id()
+        except OsReleaseIdError:
+            distro = 'unknown'
+    return distro == 'fedora'
+
+
 def _get_repo_for_platform():
     if _is_deb_based():
         from ._deb import Ubuntu
         return Ubuntu
+    elif _is_dnf_based():
+        from ._dnf import Dnf
+        return Dnf
     else:
         from ._base import DummyRepo
         return DummyRepo
