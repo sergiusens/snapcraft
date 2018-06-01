@@ -20,7 +20,7 @@ import subprocess
 import tempfile
 from textwrap import dedent
 
-from ._qemu_command import QemuDriver
+from ._qemu_driver import QemuDriver
 from snapcraft.internal.build_providers._base_provider import Provider
 
 
@@ -40,6 +40,7 @@ class Qemu(Provider):
     def __init__(self, *, project, echoer) -> None:
         super().__init__(project=project, echoer=echoer)
         self._qemu_driver = QemuDriver(
+            ssh_username='builder',
             ssh_key_file='/home/sergiusens/.ssh/id_rsa')
 
     def create(self) -> None:

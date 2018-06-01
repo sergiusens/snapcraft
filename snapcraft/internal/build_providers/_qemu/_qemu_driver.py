@@ -15,13 +15,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
-import select
 import shlex
 import shutil
 import socket
 import subprocess
 import sys
-import telnetlib
+from telnetlib import Telnet
 from time import sleep
 from typing import List, Sequence
 
@@ -60,7 +59,7 @@ class QemuDriver:
     _PROJECT_DEV = 'project_dev'
     _PROJECT_MOUNT = 'project_mount'
 
-    def __init__(self, *, ssh_key_file: str) -> None:
+    def __init__(self, *, ssh_username: str, ssh_key_file: str) -> None:
         """Initialize a QemuCommand instance.
 
         :raises errors.ProviderCommandNotFound:
@@ -71,11 +70,14 @@ class QemuDriver:
             raise errors.ProviderCommandNotFound(command=provider_cmd)
         self.provider_cmd = provider_cmd
         # TODO detect collisions and make dynamic
-        self.telnet_port = 64444
+        self._telnet_port = 64444
         # TODO detect collisions and make dynamic
-        self.ssh_port = 5555
+        self._ssh_port = 5555
+        self._ssh_username = ssh_username
         self._ssh_key_file = ssh_key_file
         self._qemu_proc = None  # type: subprocess.Popen
+        self._ssh_handle = paramiko.SSHClient()
+        self._ssh_handle.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     def launch(self, *, hda: str, qcow2_drives: Sequence,
                project_9p_dev: str, ram: str=None,
@@ -83,7 +85,7 @@ class QemuDriver:
         cmd = [
             'sudo', self.provider_cmd,
             '-m', ram,  # '-nographic',
-            '-monitor', 'telnet::{},server,nowait'.format(self.telnet_port),
+            '-monitor', 'telnet::{},server,nowait'.format(self._telnet_port),
             '-hda', hda,
             '-fsdev', 'local,id={},path={},security_model=none'.format(
                 self._PROJECT_DEV, project_9p_dev),
@@ -91,7 +93,7 @@ class QemuDriver:
                 self._PROJECT_DEV, self._PROJECT_MOUNT),
             '-device', 'e1000,netdev=net0',
             '-netdev', 'user,id=net0,hostfwd=tcp::{}-:22'.format(
-                self.ssh_port)]
+                self._ssh_port)]
         for drive in qcow2_drives:
             cmd.append('-drive')
             cmd.append('file={},if=virtio,format=qcow2'.format(drive))
@@ -107,58 +109,68 @@ class QemuDriver:
         self._wait_for_ssh()
 
     def stop(self, *, instance_name: str) -> None:
-        telnet = telnetlib.Telnet(host='localhost', port=self.telnet_port)
-        telnet.read_until('(qemu) '.encode())
-        telnet.write('savevm latest\n'.encode())
-        telnet.read_until('(qemu) '.encode())
-        telnet.write('quit\n'.encode())
-
-        # try:
-        #    _run(cmd)
-        # except (EOFError, OSError) as telnet_error:
-        #    raise errors.ProviderStopError(
-        #         provider_name=self.provider_name,
-        #         exit_code=None) from telnet_error
+        self._ssh_handle.close()
+        try:
+            telnet = Telnet(host='localhost', port=self._telnet_port)
+        except socket.gaierror as telnet_error:
+            raise errors.ProviderCommunicationError(
+                protocol='telnet', port=self._telnet_port,
+                error=telnet_error.strerror) from telnet_error
+        try:
+            telnet.read_until('(qemu) '.encode())
+            telnet.write('savevm latest\n'.encode())
+            telnet.read_until('(qemu) '.encode())
+            telnet.write('quit\n'.encode())
+        except (OSError, EOFError) as telnet_error:
+            raise errors.ProviderStopError(
+                provider_name=self.provider_name,
+                exit_code=None) from telnet_error
 
     def execute(self, *, command: List[str]) -> None:
         # Properly quote and join the command
         command_string = ' '.join([shlex.quote(c) for c in command])
 
-        # Start up an ssh session
-        # TODO startup the session and channel only once to send over
-        # multiple commands over the same connection.
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect('localhost', port=self.ssh_port,
-                    username='builder', key_filename=self._ssh_key_file)
-        channel = ssh.get_transport().open_session()
+        channel = self._ssh_handle.get_transport().open_session()
         channel.get_pty()
         channel.exec_command(command_string)
-
         channel.settimeout(0.0)
-        while True:
-            r, w, e = select.select([channel], [], [])
-            if channel in r:
-                try:
-                    x = channel.recv(1024).decode()
-                    if len(x) == 0:
-                        break
-                    sys.stdout.write(x)
-                    sys.stdout.flush()
-                except socket.timeout:
-                    pass
-        ssh.close()
-        # except subprocess.CalledProcessError as process_error:
-        #     raise errors.ProviderExecError(
-        #         provider_name=self.provider_name,
-        #         command=command,
-        #         exit_code=process_error.returncode) from process_error
+
+        exit_code = None
+        while exit_code is None:
+            if channel.recv_ready():
+                sys.stdout.write(channel.recv(1024).decode())
+                sys.stdout.flush()
+            if channel.exit_status_ready():
+                exit_code = channel.recv_exit_status()
+                logger.debug('Command {!r} returned exit code: {}'.format(
+                    command_string, exit_code))
+
+        if exit_code != 0:
+            raise errors.ProviderExecError(
+                provider_name=self.provider_name,
+                command=command,
+                exit_code=exit_code)
 
     def _wait_for_ssh(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        result = None
-        while result != 0:
-            sleep(60)
-            result = sock.connect_ex(('localhost', self.ssh_port))
+        ssh_port_listening = False
+        while not ssh_port_listening:
+            sleep(1)
+            result = sock.connect_ex(('localhost', self._ssh_port))
             logger.debug('Pinging for ssh availability: port check {}'.format(
                 result))
+            if result == 0:
+                sock.close()
+                ssh_port_listening = True
+
+        ssh_service_ready = False
+        while not ssh_service_ready:
+            sleep(1)
+            try:
+                self._ssh_handle.connect('localhost',
+                                         port=self._ssh_port,
+                                         username=self._ssh_username,
+                                         key_filename=self._ssh_key_file)
+                ssh_service_ready = True
+            except paramiko.SSHException as ssh_error:
+                logger.debug('Pinging for ssh: {}'.format(str(ssh_error)))

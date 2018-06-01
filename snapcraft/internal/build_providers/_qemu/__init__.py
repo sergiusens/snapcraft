@@ -15,4 +15,3 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from ._qemu import Qemu                 # noqa: F401
-from ._qemu_command import QemuDriver   # noqa: F401
