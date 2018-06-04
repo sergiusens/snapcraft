@@ -20,8 +20,8 @@ import shutil
 import socket
 import subprocess
 import sys
-from telnetlib import Telnet
-from time import sleep
+import telnetlib
+import time
 from typing import List, Sequence
 
 import paramiko
@@ -30,16 +30,8 @@ from snapcraft.internal.build_providers import errors
 
 
 logger = logging.getLogger(__name__)
-
-
-def _run(command: List) -> None:
-    logger.debug('Running {}'.format(' '.join(command)))
-    subprocess.check_call(command)
-
-
-def _run_output(command: List) -> bytes:
-    logger.debug('Running {}'.format(' '.join(command)))
-    return subprocess.check_output(command)
+# Avoid getting paramiko logs which are overly verbose.
+logging.getLogger('paramiko').setLevel(logging.CRITICAL)
 
 
 def _popen(command: List) -> subprocess.Popen:
@@ -82,9 +74,12 @@ class QemuDriver:
     def launch(self, *, hda: str, qcow2_drives: Sequence,
                project_9p_dev: str, ram: str=None,
                enable_kvm: bool=True) -> None:
+        # TODO check for latest snapshot to launch for it instead of a cold
+        #      boot.
+        # TODO replace -nographic with a spinner and redirect to a log file.
         cmd = [
             'sudo', self.provider_cmd,
-            '-m', ram,  # '-nographic',
+            '-m', ram, '-nographic',
             '-monitor', 'telnet::{},server,nowait'.format(self._telnet_port),
             '-hda', hda,
             '-fsdev', 'local,id={},path={},security_model=none'.format(
@@ -100,18 +95,22 @@ class QemuDriver:
         if enable_kvm:
             cmd.append('-enable-kvm')
 
-        try:
-            self._qemu_proc = _popen(cmd)
-        except subprocess.CalledProcessError as process_error:
+        # TODO we might want to spawn another thread here to keep an eye on
+        #      the process. This is good enough for now.
+        self._qemu_proc = _popen(cmd)
+        # Check the immediate return code to make sure things haven't gone
+        # wrong.
+        proc_poll = self._qemu_proc.poll()
+        if proc_poll is not None and proc_poll != 0:
             raise errors.ProviderLaunchError(
                 provider_name=self.provider_name,
-                exit_code=process_error.returncode) from process_error
+                exit_code=proc_poll)
         self._wait_for_ssh()
 
-    def stop(self, *, instance_name: str) -> None:
+    def stop(self) -> None:
         self._ssh_handle.close()
         try:
-            telnet = Telnet(host='localhost', port=self._telnet_port)
+            telnet = telnetlib.Telnet(host='localhost', port=self._telnet_port)
         except socket.gaierror as telnet_error:
             raise errors.ProviderCommunicationError(
                 protocol='telnet', port=self._telnet_port,
@@ -155,7 +154,7 @@ class QemuDriver:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ssh_port_listening = False
         while not ssh_port_listening:
-            sleep(1)
+            time.sleep(1)
             result = sock.connect_ex(('localhost', self._ssh_port))
             logger.debug('Pinging for ssh availability: port check {}'.format(
                 result))
@@ -165,7 +164,7 @@ class QemuDriver:
 
         ssh_service_ready = False
         while not ssh_service_ready:
-            sleep(1)
+            time.sleep(1)
             try:
                 self._ssh_handle.connect('localhost',
                                          port=self._ssh_port,

@@ -50,7 +50,7 @@ class Qemu(Provider):
 
     def destroy(self) -> None:
         """Destroy the instance, trying to stop it first."""
-        self._qemu_driver.stop(instance_name=self.instance_name)
+        self._qemu_driver.stop()
 
     def mount_project(self) -> None:
         self._qemu_driver.execute(command=[
