@@ -52,7 +52,7 @@ def add_build_options(hidden=False):
     return _add_build_options
 
 
-def get_project_options(**kwargs):
+def get_project(**kwargs):
     ctx = click.get_current_context()
     for key, value in ctx.parent.params.items():
         if not kwargs.get(key):

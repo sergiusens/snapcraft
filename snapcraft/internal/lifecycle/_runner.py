@@ -39,7 +39,7 @@ from . import constants
 logger = logging.getLogger(__name__)
 
 
-def execute(step, project_options, part_names=None):
+def execute(step, project, project_config, part_names=None):
     """Execute until step in the lifecycle for part_names or all parts.
 
     Lifecycle execution will happen for each step iterating over all
@@ -51,21 +51,20 @@ def execute(step, project_options, part_names=None):
     and after is not in this set, an exception will be raised.
 
     :param str step: A valid step in the lifecycle: pull, build, prime or snap.
-    :param project_options: Runtime options for the project.
+    :param Project project: General information about the project.
     :param list part_names: A list of parts to execute the lifecycle on.
     :raises RuntimeError: If a prerequesite of the part needs to be staged
                           and such part is not in the list of parts to iterate
                           over.
     :returns: A dict with the snap name, version, type and architectures.
     """
-    config = project_loader.load_config(project_options)
     installed_packages = repo.Repo.install_build_packages(
-        config.build_tools)
+        project_config.build_tools)
     if installed_packages is None:
         raise ValueError(
             'The repo backend is not returning the list of installed packages')
 
-    installed_snaps = repo.snaps.install_snaps(config.build_snaps)
+    installed_snaps = repo.snaps.install_snaps(project_config.build_snaps)
 
     os.makedirs(constants.SNAPCRAFT_INTERNAL_DIR, exist_ok=True)
     state_path = os.path.join(constants.SNAPCRAFT_INTERNAL_DIR, 'state')
@@ -73,16 +72,15 @@ def execute(step, project_options, part_names=None):
         state_file.write(yaml.dump(
             states.GlobalState(installed_packages, installed_snaps)))
 
-    if _should_get_core(config.data.get('confinement')):
-        _setup_core(project_options.deb_arch,
-                    config.data.get('base', 'core'))
+    if _should_get_core(project_config.data.get('confinement')):
+        _setup_core(project.deb_arch, project_config.data.get('base', 'core'))
 
-    _Executor(config, project_options).run(step, part_names)
+    _Executor(project_config, project).run(step, part_names)
 
-    return {'name': config.data['name'],
-            'version': config.data.get('version'),
-            'arch': config.data['architectures'],
-            'type': config.data.get('type', '')}
+    return {'name': project_config.data['name'],
+            'version': project_config.data.get('version'),
+            'arch': project_config.data['architectures'],
+            'type': project_config.data.get('type', '')}
 
 
 def _setup_core(deb_arch, base):
@@ -148,9 +146,9 @@ def _replace_in_part(part):
 
 class _Executor:
 
-    def __init__(self, config, project_options):
+    def __init__(self, config, project):
         self.config = config
-        self.project_options = project_options
+        self.project = project
         self.parts_config = config.parts
         self._steps_run = self._init_run_states()
 
@@ -234,9 +232,7 @@ class _Executor:
         if step == 'prime' and part_names == self.config.part_names:
             common.env = self.config.snap_env()
             meta.create_snap_packaging(
-                self.config.data, self.config.parts, self.project_options,
-                self.config.snapcraft_yaml_path,
-                self.config.original_snapcraft_yaml,
+                self.config.data, self.config.parts, self.project,
                 self.config.validator.schema)
 
     def _handle_dirty(self, part, step, dirty_report, cli_config):

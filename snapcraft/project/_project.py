@@ -24,6 +24,6 @@ class Project(ProjectOptions):
 
     def __init__(self, *, use_geoip=False, parallel_builds=True,
                  target_deb_arch: str=None, debug=False) -> None:
-        self.info = None  # type: ProjectInfo
+        self.info = ProjectInfo()  # type: ProjectInfo
 
         super().__init__(use_geoip, parallel_builds, target_deb_arch, debug)

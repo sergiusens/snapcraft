@@ -46,28 +46,3 @@ def replace_attr(
                 for k in attr}
 
     return attr
-
-
-def get_snapcraft_yaml(base_dir=None):
-    possible_yamls = [
-        os.path.join('snap', 'snapcraft.yaml'),
-        'snapcraft.yaml',
-        '.snapcraft.yaml',
-    ]
-
-    if base_dir:
-        possible_yamls = [os.path.join(base_dir, x) for x in possible_yamls]
-
-    snapcraft_yamls = [y for y in possible_yamls if os.path.exists(y)]
-
-    import snapcraft.internal.errors
-    from snapcraft.internal.project_loader import errors
-    if not snapcraft_yamls:
-        raise errors.MissingSnapcraftYamlError(
-            snapcraft_yaml='snap/snapcraft.yaml')
-    elif len(snapcraft_yamls) > 1:
-        raise snapcraft.internal.errors.SnapcraftEnvironmentError(
-            'Found a {!r} and a {!r}, please remove one.'.format(
-                snapcraft_yamls[0], snapcraft_yamls[1]))
-
-    return snapcraft_yamls[0]

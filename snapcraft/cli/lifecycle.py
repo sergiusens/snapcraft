@@ -18,19 +18,24 @@ import click
 import os
 
 from snapcraft.internal import deprecations, lifecycle, lxd, project_loader
-from ._options import add_build_options, get_project_options
+from ._options import add_build_options, get_project
 from . import echo
 from . import env
 
 
 def _execute(command, parts, **kwargs):
-    project_options = get_project_options(**kwargs)
+    project = get_project(**kwargs)
+    project_config = project_loader.load_config(project)
     build_environment = env.BuilderEnvironmentConfig()
+
+    if project.info.base is not None:
+        echo.warning('The use of the base keyword is experimental and subject '
+                     'to behavioral changes.')
     if build_environment.is_host:
-        lifecycle.execute(command, project_options, parts)
+        lifecycle.execute(command, project, project_config, parts)
     else:
-        lifecycle.containerbuild(command, project_options, parts)
-    return project_options
+        lifecycle.containerbuild(command, project, project_config, parts)
+    return project
 
 
 @click.group()
@@ -128,14 +133,14 @@ def snap(directory, output, **kwargs):
     if directory:
         deprecations.handle_deprecation_notice('dn6')
 
-    project_options = get_project_options(**kwargs)
+    project = get_project(**kwargs)
     build_environment = env.BuilderEnvironmentConfig()
     if build_environment.is_host:
         snap_name = lifecycle.snap(
-            project_options, directory=directory, output=output)
+            project, directory=directory, output=output)
         echo.info('Snapped {}'.format(snap_name))
     else:
-        lifecycle.containerbuild('snap', project_options, output, directory)
+        lifecycle.containerbuild('snap', project, output, directory)
 
 
 @lifecyclecli.command()
@@ -172,7 +177,7 @@ def clean(parts, step, **kwargs):
         snapcraft clean
         snapcraft clean my-part --step build
     """
-    project_options = get_project_options(**kwargs)
+    project = get_project(**kwargs)
     build_environment = env.BuilderEnvironmentConfig()
     if build_environment.is_host:
         step = step or 'pull'
@@ -180,10 +185,10 @@ def clean(parts, step, **kwargs):
             echo.warning('DEPRECATED: Use `prime` instead of `strip` '
                          'as the step to clean')
             step = 'prime'
-        lifecycle.clean(project_options, parts, step)
+        lifecycle.clean(project, parts, step)
     else:
-        config = project_loader.load_config(project_options)
-        lxd.Project(project_options=project_options,
+        config = project_loader.load_config(project)
+        lxd.Project(project_options=project,
                     output=None, source=os.path.curdir,
                     metadata=config.get_metadata()).clean(parts, step)
 
@@ -215,8 +220,10 @@ def cleanbuild(remote, debug, **kwargs):
     # sense in this scenario.
     build_environment = env.BuilderEnvironmentConfig(
         default='lxd', additional_providers=['multipass'])
-    project_options = get_project_options(**kwargs, debug=debug)
-    lifecycle.cleanbuild(project=project_options,
+    project = get_project(**kwargs, debug=debug)
+    project_config = project_loader.load_config(project)
+    lifecycle.cleanbuild(project=project,
+                         project_config=project_config,
                          echoer=echo,
                          remote=remote,
                          build_environment=build_environment)
