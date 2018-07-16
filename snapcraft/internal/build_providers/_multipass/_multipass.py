@@ -16,6 +16,7 @@
 
 import os
 import shlex
+from typing import Sequence
 
 from .._base_provider import Provider
 from ._instance_info import InstanceInfo
@@ -25,7 +26,7 @@ from ._multipass_command import MultipassCommand
 class Multipass(Provider):
     """A multipass provider for snapcraft to execute its lifecycle."""
 
-    def _run(self, command) -> None:
+    def _run(self, command: Sequence[str], hide_output: bool = False) -> None:
         self._multipass_cmd.execute(instance_name=self.instance_name, command=command)
 
     def _launch(self) -> None:
@@ -73,7 +74,8 @@ class Multipass(Provider):
 
         # First create a working directory
         self._multipass_cmd.execute(
-            command=["mkdir", self.project_dir], instance_name=self.instance_name
+            command=["mkdir", "-p", self.project.project_dir],
+            instance_name=self.instance_name,
         )
 
         # Then copy the tarball over
@@ -81,7 +83,7 @@ class Multipass(Provider):
         self._multipass_cmd.copy_files(source=tarball, destination=destination)
 
         # Finally extract it into project_dir.
-        extract_cmd = ["tar", "-xvf", tarball, "-C", self.project_dir]
+        extract_cmd = ["tar", "-xvf", tarball, "-C", self.project.project_dir]
         self._multipass_cmd.execute(
             command=extract_cmd, instance_name=self.instance_name
         )
@@ -90,7 +92,7 @@ class Multipass(Provider):
         # TODO add instance check.
         # Use the full path as /snap/bin is not in PATH.
         snapcraft_cmd = "cd {}; /snap/bin/snapcraft snap --output {}".format(
-            self.project_dir, self.snap_filename
+            self.project.project_dir, self.snap_filename
         )
         self._multipass_cmd.execute(
             command=["sh", "-c", snapcraft_cmd], instance_name=self.instance_name
@@ -99,7 +101,7 @@ class Multipass(Provider):
     def retrieve_snap(self) -> str:
         # TODO add instance check.
         source = "{}:{}/{}".format(
-            self.instance_name, self.project_dir, self.snap_filename
+            self.instance_name, self.project.project_dir, self.snap_filename
         )
         self._multipass_cmd.copy_files(source=source, destination=self.snap_filename)
         return self.snap_filename

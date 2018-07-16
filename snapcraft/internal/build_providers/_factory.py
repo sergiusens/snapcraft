@@ -17,7 +17,6 @@
 from typing import TYPE_CHECKING
 
 from . import errors
-from ._multipass import Multipass
 
 if TYPE_CHECKING:
     from typing import Type  # noqa: F401
@@ -28,6 +27,12 @@ if TYPE_CHECKING:
 def get_provider_for(provider_name: str) -> "Type[Provider]":
     """Returns a Type that can build with provider_name."""
     if provider_name == "multipass":
+        from ._multipass import Multipass
+
         return Multipass
+    elif provider_name == "qemu":
+        from ._qemu import Qemu
+
+        return Qemu
     else:
         raise errors.ProviderNotSupportedError(provider=provider_name)

@@ -1,6 +1,6 @@
 # -*- Mode:Python; indent-tabs-mode:nil; tab-width:4 -*-
 #
-# Copyright (C) 2015-2017 Canonical Ltd
+# Copyright (C) 2018 Canonical Ltd
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 3 as
@@ -13,6 +13,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import os
 
-SNAPCRAFT_INTERNAL_DIR = os.path.join("snap", ".snapcraft")
+
+class MountDevice:
+    def __init__(self, *, host_path: str, dev: str, mount_tag: str) -> None:
+        self.host_path = host_path
+        self.dev = dev
+        self.mount_tag = mount_tag

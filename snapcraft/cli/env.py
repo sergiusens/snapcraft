@@ -52,7 +52,7 @@ class BuilderEnvironmentConfig:
         :param str additional_providers: Additional providers allowed in the
                                          environment.
         """
-        valid_providers = ["host", "lxd"]
+        valid_providers = ["host", "lxd", "qemu"]
         if additional_providers is not None:
             valid_providers.extend(additional_providers)
 
@@ -91,6 +91,12 @@ class BuilderEnvironmentConfig:
                 )
             )
 
+        is_snapcraft_developer_debug = util.strtobool(
+            os.getenv("SNAPCRAFT_ENABLE_DEVELOPER_DEBUG", "n")
+        )
+
         self.provider = build_provider
         self.is_host = build_provider == "host"
         self.is_lxd = build_provider == "lxd"
+        self.is_qemu = build_provider == "qemu"
+        self.is_snapcraft_developer_debug = is_snapcraft_developer_debug

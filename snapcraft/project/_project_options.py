@@ -203,29 +203,33 @@ class ProjectOptions:
         if os.path.exists(deprecated_plugins_dir):
             handle_deprecation_notice("dn2")
             return deprecated_plugins_dir
-        return os.path.join(self.__project_dir, "snap", "plugins")
-
-    @property
-    def parts_dir(self):
-        return os.path.join(self.__project_dir, "parts")
-
-    @property
-    def stage_dir(self):
-        return os.path.join(self.__project_dir, "stage")
-
-    @property
-    def prime_dir(self):
-        return os.path.join(self.__project_dir, "prime")
+        return os.path.join(self.project_dir, "snap", "plugins")
 
     @property
     def debug(self):
         return self.__debug
 
     def __init__(
-        self, use_geoip=False, parallel_builds=True, target_deb_arch=None, debug=False
-    ):
-        # TODO: allow setting a different project dir
-        self.__project_dir = os.getcwd()
+        self,
+        use_geoip: bool = False,
+        parallel_builds: bool = True,
+        target_deb_arch: str = None,
+        debug: bool = False,
+    ) -> None:
+        self.project_dir = os.getcwd()
+
+        self.work_dir = os.path.expanduser(
+            os.getenv("SNAPCRAFT_WORKDIR", self.project_dir)
+        )
+        self.parts_dir = os.path.join(self.work_dir, "parts")
+        self.stage_dir = os.path.join(self.work_dir, "stage")
+        self.prime_dir = os.path.join(self.work_dir, "prime")
+
+        logger.debug("Work dir {}".format(self.work_dir))
+        logger.debug("Parts dir {}".format(self.parts_dir))
+        logger.debug("Stage dir {}".format(self.stage_dir))
+        logger.debug("Prime dir {}".format(self.prime_dir))
+
         self.__use_geoip = use_geoip
         self.__parallel_builds = parallel_builds
         self._set_machine(target_deb_arch)
@@ -249,7 +253,10 @@ class ProjectOptions:
             codename = os_release.OsRelease().version_codename()
             logger.debug("Running on {!r}".format(codename))
 
-        build_host_for_base = _HOST_CODENAME_FOR_BASE.get(base)  # type: str
+        build_host_for_base = _HOST_CODENAME_FOR_BASE.get(base, None)  # type: str
+        # TODO: better support for build VMs might be required.
+        if build_host_for_base is None:
+            return True
         compatible_hosts = _HOST_COMPATIBILITY.get(
             build_host_for_base, []
         )  # type: List[str]

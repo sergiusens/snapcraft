@@ -54,7 +54,7 @@ class BaseProviderTest(BaseProviderBaseTest):
 
         self.assertThat(provider.project, Equals(self.project))
         self.assertThat(provider.instance_name, Equals(self.instance_name))
-        self.assertThat(provider.project_dir, Equals("project-name"))
+        self.assertThat(provider.project_dir, Equals(self.instance_name))
         self.assertThat(
             provider.snap_filename,
             Equals("project-name_{}.snap".format(self.project.deb_arch)),

@@ -54,6 +54,7 @@ parts:
         snapcraftctl build
         TRIPLET_PATH="$SNAPCRAFT_PART_INSTALL/usr/lib/$(gcc -print-multiarch)"
         LIBSODIUM=$(readlink -n $TRIPLET_PATH/libsodium.so.18)
+        [ -f "$TRIPLET_PATH/libsodium.so" ] && rm "$TRIPLET_PATH/libsodium.so"
         ln -s $LIBSODIUM $TRIPLET_PATH/libsodium.so
         patch -d $SNAPCRAFT_PART_INSTALL/lib/python3.5/site-packages -p1 < $SNAPCRAFT_STAGE/pyyaml-support-high-codepoints.diff
         patch $SNAPCRAFT_PART_INSTALL/usr/lib/python3.5/ctypes/__init__.py $SNAPCRAFT_STAGE/ctypes_init.diff

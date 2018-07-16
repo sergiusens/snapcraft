@@ -22,6 +22,7 @@ import click
 
 import snapcraft
 from snapcraft.internal import log
+from .env import BuilderEnvironmentConfig
 from .assertions import assertionscli
 from .containers import containerscli
 from .discovery import discoverycli
@@ -53,18 +54,21 @@ command_groups = [
 @click.version_option(
     message=SNAPCRAFT_VERSION_TEMPLATE, version=snapcraft.__version__  # type: ignore
 )
-@click.pass_context
 @add_build_options(hidden=True)
 @click.option("--debug", "-d", is_flag=True, envvar="SNAPCRAFT_DEBUG")
+@click.pass_context
 def run(ctx, debug, catch_exceptions=False, **kwargs):
     """Snapcraft is a delightful packaging tool."""
 
-    if debug:
-        log_level = logging.DEBUG
+    # Since we use entry points, we might not be calling in through __main__
+    if ctx.obj is None:
+        ctx.obj = dict()
 
-        # Setting this here so that tools run within this are also in debug
-        # mode (e.g. snapcraftctl)
-        os.environ["SNAPCRAFT_DEBUG"] = "true"
+    build_environment = BuilderEnvironmentConfig()
+    ctx.obj["BUILD_ENVIRONMENT"] = build_environment
+
+    if build_environment.is_snapcraft_developer_debug:
+        log_level = logging.DEBUG
         click.echo(
             "Starting snapcraft {} from {}.".format(
                 snapcraft.__version__, os.path.dirname(__file__)
@@ -72,12 +76,19 @@ def run(ctx, debug, catch_exceptions=False, **kwargs):
         )
     else:
         log_level = logging.INFO
+    # In an ideal world, this logger setup would be replaced
+    log.configure(log_level=log_level)
+
+    # This is a `debug` flag from the point of view of the user of snapcraft
+    # only.
+    if debug:
+        # Setting this here so that tools run within this are also in debug
+        # mode (e.g. snapcraftctl)
+        os.environ["SNAPCRAFT_DEBUG"] = "true"
 
     # Setup global exception handler (to be called for unhandled exceptions)
     sys.excepthook = functools.partial(exception_handler, debug=debug)
 
-    # In an ideal world, this logger setup would be replaced
-    log.configure(log_level=log_level)
     # The default command
     if not ctx.invoked_subcommand:
         ctx.forward(lifecyclecli.commands["snap"])

@@ -20,20 +20,46 @@ import os
 from . import echo
 from . import env
 from ._options import add_build_options, get_project
-from snapcraft.internal import deprecations, lifecycle, lxd, project_loader, steps
+from snapcraft.internal import (
+    build_providers,
+    deprecations,
+    lifecycle,
+    lxd,
+    project_loader,
+    steps,
+)
 from snapcraft.project.errors import YamlValidationError
 
 
-def _execute(step: steps.Step, parts, **kwargs):
+def _execute(step, parts, instance_pack=False, **kwargs):
     project = get_project(**kwargs)
-    project_config = project_loader.load_config(project)
     build_environment = env.BuilderEnvironmentConfig()
 
-    if build_environment.is_host:
+    # After the swap, the trigger will be based on `base` where the
+    # default build environment will be something that triggers the
+    # build provider.
+    if build_environment.is_qemu:
+        build_provider_class = build_providers.get_provider_for("qemu")
+        echo.info("Setting up the environment.")
+        with build_provider_class(project=project, echoer=echo) as instance:
+            instance.mount_project()
+            try:
+                instance.execute_step(step)
+                if instance_pack:
+                    instance.pack_project()
+            except Exception as e:
+                if project.debug:
+                    echo.warning("An error occurred. " "Dropping into a debug shell")
+                    instance.shell()
+                    echo.info("Exiting...")
+                else:
+                    raise e
+    elif build_environment.is_host:
+        project_config = project_loader.load_config(project)
         lifecycle.execute(step, project_config, parts)
     else:
-        # containerbuild takes a snapcraft command name, not a step
-        lifecycle.containerbuild(step.name, project_config, parts)
+        project_config = project_loader.load_config(project)
+        lifecycle.containerbuild(step, project_config, parts)
     return project
 
 
@@ -128,14 +154,18 @@ def snap(directory, output, **kwargs):
     If you want to snap a directory, you should use the pack command
     instead.
     """
+    build_environment = env.BuilderEnvironmentConfig()
+    instance_pack = build_environment.is_qemu
+
     if directory:
         deprecations.handle_deprecation_notice("dn6")
     else:
-        project = _execute(steps.PRIME, parts=[], **kwargs)
+        project = _execute(steps.PRIME, parts=[], instance_pack=instance_pack, **kwargs)
         directory = project.prime_dir
 
-    snap_name = lifecycle.pack(directory, output)
-    echo.info("Snapped {}".format(snap_name))
+    if not instance_pack:
+        snap_name = lifecycle.pack(directory, output)
+        echo.info("Snapped {}".format(snap_name))
 
 
 @lifecyclecli.command()
@@ -186,12 +216,16 @@ def clean(parts, step_name, **kwargs):
     if step_name:
         if step_name == "strip":
             echo.warning(
-                "DEPRECATED: Use `prime` instead of `strip` as the step to clean"
+                "DEPRECATED: Use `prime` instead of `strip` " "as the step to clean"
             )
             step_name = "prime"
         step = steps.get_step_by_name(step_name)
 
-    if build_environment.is_host:
+    if project.info.base is not None and build_environment.is_qemu:
+        build_provider_class = build_providers.get_provider_for("qemu")
+        build_project = build_provider_class(project=project, echoer=echo)
+        build_project.clean_project()
+    elif build_environment.is_host:
         lifecycle.clean(project, parts, step)
     else:
         project_config = project_loader.load_config(project)

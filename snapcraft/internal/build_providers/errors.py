@@ -174,3 +174,23 @@ class SSHKeyFileNotFoundError(_SnapcraftError):
 
     def __init__(self, *, private_key_file_path: str) -> None:
         super().__init__(private_key_file_path=private_key_file_path)
+
+
+class BuildImageForBaseMissing(_SnapcraftError):
+
+    fmt = (
+        "Cannot find a suitable build image to use to create snaps for the "
+        "base {base!r} and architecture {deb_arch!r}.\n"
+        "Contact the creator of {base!r} for further assistance."
+    )
+
+    def __init__(self, *, base: str, deb_arch: str) -> None:
+        super().__init__(base=base, deb_arch=deb_arch)
+
+
+class BuildImageChecksumError(_SnapcraftError):
+
+    fmt = "Expected the digest for source to be {expected}, " "but it was {calculated}"
+
+    def __init__(self, expected, calculated):
+        super().__init__(expected=expected, calculated=calculated)

@@ -18,7 +18,7 @@ import logging
 import signal
 import shutil
 import subprocess
-from typing import List
+from typing import Sequence
 
 from snapcraft.internal.build_providers import errors
 
@@ -26,12 +26,12 @@ from snapcraft.internal.build_providers import errors
 logger = logging.getLogger(__name__)
 
 
-def _run(command: List) -> None:
+def _run(command: Sequence) -> None:
     logger.debug("Running {}".format(" ".join(command)))
     subprocess.check_call(command)
 
 
-def _run_output(command: List) -> bytes:
+def _run_output(command: Sequence) -> bytes:
     logger.debug("Running {}".format(" ".join(command)))
     return subprocess.check_output(command)
 
@@ -108,7 +108,7 @@ class MultipassCommand:
                 provider_name=self.provider_name, exit_code=process_error.returncode
             ) from process_error
 
-    def execute(self, *, command: List[str], instance_name: str) -> None:
+    def execute(self, *, command: Sequence[str], instance_name: str) -> None:
         """Passthrough for running multipass exec.
 
         :param list command: the command to exectute on the instance.
