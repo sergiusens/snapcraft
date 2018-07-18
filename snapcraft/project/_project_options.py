@@ -216,7 +216,9 @@ class ProjectOptions:
         target_deb_arch: str = None,
         debug: bool = False,
     ) -> None:
-        self.project_dir = os.getcwd()
+        self.project_dir = os.path.expanduser(
+            os.getenv("SNAPCRAFT_PROJECTDIR", os.getcwd())
+        )
 
         self.work_dir = os.path.expanduser(
             os.getenv("SNAPCRAFT_WORKDIR", self.project_dir)

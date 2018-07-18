@@ -195,7 +195,7 @@ def _handle_ssh_output(channel: paramiko.Channel, *, hide_output: bool) -> int:
             if not hide_output:
                 try:
                     data_stream = data_stream_b.decode()
-                except UnicodeEncodeError:
+                except UnicodeDecodeError:
                     data_stream = data_stream_b.decode("latin-1", "surrogateescape")
                 sys.stdout.write(data_stream)
                 sys.stdout.flush()
@@ -219,7 +219,7 @@ def _handle_ssh_shell(channel):
                     data_stream_b = channel.recv(1024)
                     try:
                         data_stream = data_stream_b.decode()
-                    except UnicodeEncodeError:
+                    except UnicodeDecodeError:
                         data_stream = data_stream_b.decode("latin-1", "surrogateescape")
                     if len(data_stream) == 0:
                         break

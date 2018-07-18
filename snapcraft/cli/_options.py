@@ -23,15 +23,23 @@ class HiddenOption(click.Option):
         pass
 
 
-_BUILD_OPTION_NAMES = ["--enable-geoip", "--no-parallel-builds", "--target-arch"]
+_BUILD_OPTION_NAMES = [
+    "--enable-geoip",
+    "--no-parallel-builds",
+    "--target-arch",
+    "--shell",
+    "--shell-after",
+]
 
 _BUILD_OPTIONS = [
     dict(
         is_flag=True,
-        help=("Detect best candidate location for stage-packages using geoip"),
+        help="Detect best candidate location for stage-packages using geoip",
     ),
     dict(is_flag=True, help="Force a sequential build."),
     dict(metavar="<arch>", help="Target architecture to cross compile to"),
+    dict(is_flag=True, help="Drop into a shell in lieu of running this step."),
+    dict(is_flag=True, help="Drop into a shell after the step has run"),
 ]
 
 

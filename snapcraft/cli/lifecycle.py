@@ -16,6 +16,7 @@
 
 import click
 import os
+import subprocess
 
 from . import echo
 from . import env
@@ -23,6 +24,7 @@ from ._options import add_build_options, get_project
 from snapcraft.internal import (
     build_providers,
     deprecations,
+    errors,
     lifecycle,
     lxd,
     project_loader,
@@ -31,7 +33,18 @@ from snapcraft.internal import (
 from snapcraft.project.errors import YamlValidationError
 
 
-def _execute(step, parts, instance_pack=False, **kwargs):
+def _run_sudo():
+    try:
+        subprocess.check_call(["sudo", "-v"])
+    except subprocess.CalledProcessError:
+        raise errors.SnapcraftEnvironmentError(
+            "Failed to obtain required credentials. Please try again."
+        )
+
+
+def _execute(
+    step, parts, shell=False, shell_after=False, instance_pack=False, **kwargs
+):
     project = get_project(**kwargs)
     build_environment = env.BuilderEnvironmentConfig()
 
@@ -40,16 +53,24 @@ def _execute(step, parts, instance_pack=False, **kwargs):
     # build provider.
     if build_environment.is_qemu:
         build_provider_class = build_providers.get_provider_for("qemu")
-        echo.info("Setting up the environment.")
+        if build_provider_class.requires_sudo:
+            echo.info("Launching a VM with sudo.")
+            _run_sudo()
+        else:
+            echo.info("Launching a VM.")
         with build_provider_class(project=project, echoer=echo) as instance:
             instance.mount_project()
             try:
-                instance.execute_step(step)
                 if instance_pack:
                     instance.pack_project()
+                else:
+                    instance.execute_step(step)
+                if shell_after:
+                    echo.info("Dropping into a shell.")
+                    instance.shell()
             except Exception as e:
                 if project.debug:
-                    echo.warning("An error occurred. " "Dropping into a debug shell")
+                    echo.warning("An error occurred. Dropping into a debug shell.")
                     instance.shell()
                     echo.info("Exiting...")
                 else:

@@ -19,7 +19,6 @@ import os
 import shutil
 import subprocess
 import threading
-from time import sleep
 from typing import Sequence
 
 from ._mount_device import MountDevice
@@ -123,11 +122,8 @@ class QemuCommand(threading.Thread):
                 stderr=vm_builder_log,
             )
 
-        exit_code = None
-        while exit_code is None:
-            exit_code = self.process.poll()
-            sleep(1)
-            if exit_code is not None and exit_code != 0:
-                raise errors.ProviderLaunchError(
-                    provider_name=self.provider_name, exit_code=exit_code
-                )
+        exit_code = self.process.wait()
+        if exit_code != 0:
+            raise errors.ProviderLaunchError(
+                provider_name=self.provider_name, exit_code=exit_code
+            )

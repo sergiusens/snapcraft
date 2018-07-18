@@ -17,7 +17,7 @@
 import click
 import os
 
-from snapcraft.internal import errors, lxd, project_loader
+from snapcraft.internal import lxd, project_loader, repo
 from ._options import get_project
 from . import env
 
@@ -32,7 +32,7 @@ def containerscli():
     "--debug", is_flag=True, help="Shells into the environment if the build fails."
 )
 def refresh(debug, **kwargs):
-    """Refresh an existing LXD container.
+    """Refresh the build packages cache.
 
     \b
     Examples:
@@ -43,20 +43,14 @@ def refresh(debug, **kwargs):
     """
 
     build_environment = env.BuilderEnvironmentConfig()
-    if build_environment.is_host:
-        raise errors.SnapcraftEnvironmentError(
-            "The 'refresh' command only applies to LXD containers but "
-            "SNAPCRAFT_BUILD_ENVIRONMENT is not set or set to host.\n"
-            "Maybe you meant to update the parts cache instead? "
-            "You can do that with the following command:\n\n"
-            "snapcraft update"
-        )
-
-    project = get_project(**kwargs, debug=debug)
-    config = project_loader.load_config(project)
-    lxd.Project(
-        project_options=project,
-        output=None,
-        source=os.path.curdir,
-        metadata=config.get_metadata(),
-    ).refresh()
+    if build_environment.is_lxd:
+        project = get_project(**kwargs, debug=debug)
+        config = project_loader.load_config(project)
+        lxd.Project(
+            project_options=project,
+            output=None,
+            source=os.path.curdir,
+            metadata=config.get_metadata(),
+        ).refresh()
+    else:
+        repo.Repo.refresh_build_packages()

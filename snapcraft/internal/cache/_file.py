@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class FileCache(SnapcraftCache):
     """Generic file cache."""
 
-    def __init__(self, taxonomy: str = "files") -> None:
+    def __init__(self, *, taxonomy: str = "files") -> None:
         """Create a FileCache."""
         super().__init__()
         self.file_cache = os.path.join(self.cache_root, taxonomy)
@@ -75,3 +75,21 @@ class FileCache(SnapcraftCache):
             return cached_file_path
         else:
             return None
+
+    def prune(self, *, keep_hash):
+        """Prune everything except keep_hash in XDG cache.
+
+        :returns: pruned files paths list.
+        """
+
+        pruned_files_list = []
+
+        for cached_hash in os.listdir(self.file_cache):
+            if cached_hash != keep_hash:
+                try:
+                    cached_file = os.path.join(self.file_cache, cached_hash)
+                    os.remove(cached_file)
+                    pruned_files_list.append(cached_file)
+                except OSError:
+                    logger.warning("Unable to prune file {}.".format(cached_file))
+        return pruned_files_list

@@ -43,14 +43,12 @@ BuildImageDictT = Dict[Tuple[str, str], _Image]
 
 def _get_build_images() -> BuildImageDictT:
     images = dict()  # type: BuildImageDictT
-    images["core", "amd64"] = (
-        _Image(
-            base="core",
-            snap_arch="amd64",
-            url="https://cloud-images.ubuntu.com/releases/16.04/release-20180703/ubuntu-16.04-server-cloudimg-amd64-disk1.img",  # noqa: E501
-            checksum="79549e87ddfc61b1cc8626a67ccc025cd7111d1af93ec28ea46ba6de70819f8c",  # noqa: E501
-            algorithm="sha256",
-        ),
+    images["core16", "amd64"] = _Image(
+        base="core16",
+        snap_arch="amd64",
+        url="https://cloud-images.ubuntu.com/releases/16.04/release-20180703/ubuntu-16.04-server-cloudimg-amd64-disk1.img",  # noqa: E501
+        checksum="79549e87ddfc61b1cc8626a67ccc025cd7111d1af93ec28ea46ba6de70819f8c",  # noqa: E501
+        algorithm="sha256",
     )
     images["core18", "amd64"] = _Image(
         base="core18",
@@ -63,19 +61,14 @@ def _get_build_images() -> BuildImageDictT:
 
 
 class BuildImages:
-    def __init__(self) -> None:
-        self._image_cache = FileCache("build-images")
-
-    def _cache_hit(self, *, checksum: str, algorithm: str) -> str:
-        return self._image_cache.get(hash=checksum, algorithm=algorithm)
-
-    def _cache(self, image: _Image) -> str:
+    def _cache(self, image: _Image, image_cache) -> str:
         request = requests.get(image.url, stream=True, allow_redirects=True)
         request.raise_for_status()
 
-        with tempfile.TemporaryDirectory(
-            prefix=self._image_cache.file_cache
-        ) as tmp_dir:
+        # First create the prefix as tempfile.TemporaryDirectory does not do that for you
+        os.makedirs(image_cache.file_cache, exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix=image_cache.file_cache) as tmp_dir:
             download_file = os.path.join(tmp_dir, "{}-vm".format(image.base))
             download_requests_stream(request, download_file)
 
@@ -83,7 +76,7 @@ class BuildImages:
             if image.checksum != calculated_digest:
                 raise errors.BuildImageChecksumError(image.checksum, calculated_digest)
 
-            return self._image_cache.cache(
+            return image_cache.cache(
                 filename=download_file, algorithm=image.algorithm, hash=image.checksum
             )
 
@@ -95,12 +88,12 @@ class BuildImages:
                 base=base, deb_arch=deb_arch
             ) from key_error
 
-        cached_file = self._cache_hit(
-            checksum=image.checksum, algorithm=image.algorithm
-        )
+        image_cache = FileCache(taxonomy="build-images-{}".format(base))
+        cached_file = image_cache.get(hash=image.checksum, algorithm=image.algorithm)
         if not cached_file:
-            cached_file = self._cache(image)
-
+            cached_file = self._cache(image, image_cache)
+            # TODO verify nothing is using this as a backing store
+            # image_cache.prune(keep_hash=image.checksum)
         return cached_file
 
     def setup(self, *, base: str, deb_arch: str, size: str, image_path: str) -> None:

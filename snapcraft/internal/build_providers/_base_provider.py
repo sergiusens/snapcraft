@@ -56,6 +56,7 @@ class Provider:
     __metaclass__ = abc.ABCMeta
 
     _SNAPS_MOUNTPOINT = os.path.join(os.path.sep, "var", "cache", "snapcraft", "snaps")
+    requires_sudo = False
 
     def __init__(self, *, project, echoer, instance_name: str = None) -> None:
         self.project = project
@@ -78,7 +79,7 @@ class Provider:
             )
 
         self.provider_project_dir = os.path.join(
-            BaseDirectory.xdg_cache_home, "snapcraft", "projects", project.info.name
+            BaseDirectory.xdg_data_home, "snapcraft", "projects", project.info.name
         )
 
         self._install_registry = InstallRegistry(
@@ -170,12 +171,17 @@ class Provider:
 
     def launch_instance(self) -> None:
         self._launch()
+        self._setup_snapcraft()
+        first_run_file = os.path.join(self.provider_project_dir, "first_run")
+        if not os.path.exists(first_run_file):
+            self._run(command=["snapcraft", "refresh"])
+            open(first_run_file, "w").close()
 
     def execute_step(self, step: steps.Step) -> None:
-        self._run(command=["sudo", "snapcraft", step.name])
+        self._run(command=["snapcraft", step.name])
 
     def pack_project(self) -> None:
-        self._run(command=["sudo", "snapcraft", "snap"])
+        self._run(command=["snapcraft", "snap"])
 
     def _disable_and_wait_for_refreshes(self):
         # Disable autorefresh for 15 minutes,
@@ -197,7 +203,7 @@ class Provider:
                 ["sudo", "snap", "watch", "--last=auto-refresh"], hide_output=True
             )
 
-    def setup_snapcraft(self) -> None:
+    def _setup_snapcraft(self) -> None:
         # Pre check if need need any setup
         snap_ops = []  # type: List[_SnapOp]
         # Order is important, first comes the base, then comes snapcraft.

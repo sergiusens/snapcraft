@@ -87,6 +87,11 @@ class BaseRepo:
         raise errors.NoNativeBackendError()
 
     @classmethod
+    def refresh_build_packages(cls) -> None:
+        """Refresh the build packages cache."""
+        raise errors.NoNativeBackendError()
+
+    @classmethod
     def install_build_packages(cls, package_names: List[str]) -> List[str]:
         """Install packages on the host required to build.
 

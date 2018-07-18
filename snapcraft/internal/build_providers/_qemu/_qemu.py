@@ -34,20 +34,14 @@ logger = logging.getLogger(__name__)
 class Qemu(Provider):
     """A multipass provider for snapcraft to execute its lifecycle."""
 
+    requires_sudo = True
+
     def _run(self, command: Sequence[str], hide_output: bool = False) -> None:
         self._qemu_driver.execute(command=command, hide_output=hide_output)
-
-    def _request_sudo(self) -> None:
-        self.echoer.wrapped(
-            "Launching a VM requires sudo, your password may "
-            "be required at this point."
-        )
-        subprocess.check_call(["sudo", "true"])
 
     def _launch(self) -> None:
         self.setup_disk_image(image_path=self._hda_img)
         self._setup_cloud_img()
-        self._request_sudo()
         mount_devices = [self._snaps_dir_device_mount, self._project_device_mount]
         self._qemu_driver.launch(
             hda=self._hda_img,
@@ -110,7 +104,7 @@ class Qemu(Provider):
             ssh_key = SSHKey(root_dir=self.provider_project_dir)
         except errors.SSHKeyFileNotFoundError:
             logger.debug(
-                "No SSH keys found. Generating SSH keys to access " "the environment."
+                "No SSH keys found. Generating SSH keys to access the environment."
             )
             ssh_key = SSHKey.new_key(root_dir=self.provider_project_dir)
         self._ssh_key = ssh_key
@@ -122,7 +116,6 @@ class Qemu(Provider):
     def create(self) -> None:
         """Create the qemu instance and setup the build environment."""
         self.launch_instance()
-        self.setup_snapcraft()
 
     def destroy(self) -> None:
         """Destroy the instance, trying to stop it first."""
@@ -163,7 +156,7 @@ class Qemu(Provider):
                         """\
                     #cloud-config
                     manage_etc_hosts: true
-                    package_update: true
+                    package_update: false
                     growpart:
                         mode: growpart
                         devices: ["/"]
@@ -182,15 +175,44 @@ class Qemu(Provider):
                           content: |
                             #!/bin/sh
 
+                            set -e
+
                             # Make sure we operate in inside-VM mode.
                             export SNAPCRAFT_WORKDIR="~"
+                            export SNAPCRAFT_PROJECTDIR="{project_dir}"
 
+                            mkdir -p {project_dir}
                             cd {project_dir}
 
                             exec /snap/bin/snapcraft "$@"
+                        - path: /etc/skel/.bashrc
+                          permissions: 0644
+                          content: |
+                            export SNAPCRAFT_WORKDIR="~"
+                            export SNAPCRAFT_PROJECTDIR="{project_dir}"
+
+                            export PS1="\h \$(/bin/_snapcraft_prompt)# "
+                        - path: /bin/_snapcraft_prompt
+                          permissions: 0755
+                          content: |
+                            #!/bin/bash
+
+                            if [[ "$PWD" =~ ^$HOME.* ]]; then
+                                path="${{PWD/#$HOME/\ ..}}"
+                                if [[ "$path" == " .." ]]; then
+                                    ps1=""
+                                else
+                                    ps1="$path"
+                                fi
+                            else
+                                ps1="$PWD"
+                            fi
+
+                            echo -n $ps1
                 """
                     ).format(
                         user=self.user,
+                        project_name=self.project.info.name,
                         project_dir=self.project_dir,
                         public_key=public_key,
                     ),
