@@ -58,9 +58,9 @@ command_groups = [
 @click.version_option(
     message=SNAPCRAFT_VERSION_TEMPLATE, version=snapcraft.__version__  # type: ignore
 )
+@click.pass_context
 @add_build_options(hidden=True)
 @click.option("--debug", "-d", is_flag=True)
-@click.pass_context
 def run(ctx, debug, catch_exceptions=False, **kwargs):
     """Snapcraft is a delightful packaging tool."""
 

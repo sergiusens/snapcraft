@@ -24,7 +24,6 @@ from ._runner import run
 from .snapcraftctl._runner import run as run_snapcraftctl  # noqa
 from .echo import warning
 
-
 # If the locale ends up being ascii, Click will barf. Let's try to prevent that
 # here by using C.UTF-8 as a last-resort fallback. This mostly happens in CI,
 # using LXD or Docker. This is the same logic used by Click to error out.
@@ -40,4 +39,4 @@ if codecs.lookup(locale.getpreferredencoding()).name == "ascii" and os.name == "
             break
 
 if __name__ == "__main__":
-    run(obj={}, prog_name="snapcraft")
+    run(prog_name="snapcraft")
