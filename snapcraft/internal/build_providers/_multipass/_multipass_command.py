@@ -18,7 +18,7 @@ import logging
 import signal
 import shutil
 import subprocess
-from typing import Any, Callable, List, Union  # noqa: F401
+from typing import Any, Callable, List, Sequence, Union  # noqa: F401
 
 from snapcraft.internal.build_providers import errors
 
@@ -113,10 +113,10 @@ class MultipassCommand:
     ) -> None:
         """Passthrough for running multipass exec.
 
-        :param list command: the command to exectute on the instance.
+        :param Sequence command: the command to exectute on the instance.
         :param str instance_name: the name of the instance to execute command.
         """
-        cmd = [self.provider_cmd, "exec", instance_name, "--"] + command
+        cmd = [self.provider_cmd, "exec", instance_name, "--"] + list(command)
         if hide_output:
             runnable = _run_output  # type: Callable[[List[Any]], Union[bytes, None]]
         else:

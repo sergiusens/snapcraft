@@ -23,7 +23,6 @@ import click
 
 import snapcraft
 from snapcraft.internal import log
-from .env import BuilderEnvironmentConfig
 from .assertions import assertionscli
 from .containers import containerscli
 from .discovery import discoverycli

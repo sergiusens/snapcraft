@@ -15,17 +15,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import abc
-import contextlib
-import datetime
+import logging
 import os
 import shlex
-import tempfile
-from typing import List
+from typing import Sequence
 
-import petname
 from xdg import BaseDirectory
 
+from ._images import setup as disk_image_setup
 from ._snap import SnapInjector
+from snapcraft.internal import steps
+
+
+logger = logging.getLogger(__name__)
 
 
 class Provider:
@@ -139,10 +141,9 @@ class Provider:
             return
 
         logger.debug("Setting up disk image.")
-        images_repo = images.BuildImages()
-        images_repo.setup(
+        disk_image_setup(
             base=self.project.info.base,
-            deb_arch=self.project.deb_arch,
+            snap_arch=self.project.deb_arch,
             image_path=image_path,
             size="256G",
         )
