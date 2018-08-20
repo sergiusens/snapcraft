@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os
-import subprocess
 from unittest import mock
 
 from testtools.matchers import Contains, Equals, FileExists, Not
@@ -27,7 +26,6 @@ from snapcraft.storeapi.errors import (
     StoreUploadError,
 )
 import tests
-from tests import fixture_setup
 from . import CommandBaseTestCase
 
 
@@ -78,64 +76,6 @@ class PushCommandTestCase(PushCommandBaseTestCase):
             "Revision 9 of 'basic' created\.",
         )
         mock_upload.assert_called_once_with("basic", self.snap_file)
-
-    def test_push_a_snap_running_from_snap(self):
-        self.useFixture(fixture_setup.FakeSnapcraftIsASnap())
-
-        mock_tracker = mock.Mock(storeapi._status_tracker.StatusTracker)
-        mock_tracker.track.return_value = {
-            "code": "ready_to_release",
-            "processed": True,
-            "can_release": True,
-            "url": "/fake/url",
-            "revision": 9,
-        }
-        patcher = mock.patch.object(storeapi.StoreClient, "upload")
-        mock_upload = patcher.start()
-        self.addCleanup(patcher.stop)
-        mock_upload.return_value = mock_tracker
-
-        original_exists = os.path.exists
-
-        def _fake_exists(path):
-            if path == "/snap/snapcraft/current/usr/bin/unsquashfs":
-                return True
-            else:
-                return original_exists(path)
-
-        actual_unsquashfs_path = None
-        original_check_output = subprocess.check_output
-
-        # Push requires unsquashfs to work, but we're faking it out to use one
-        # that doesn't exist. So we record what path it WOULD use, and then
-        # pass it through to the real one so the rest of the function works.
-        def _fake_check_output(*args, **kwargs):
-            nonlocal actual_unsquashfs_path
-            if "unsquashfs" in args[0][0]:
-                actual_unsquashfs_path = args[0][0]
-                args[0][0] = "unsquashfs"
-
-            return original_check_output(*args, **kwargs)
-
-        # Upload
-        with mock.patch("subprocess.check_output", side_effect=_fake_check_output):
-            with mock.patch("snapcraft.storeapi._status_tracker.StatusTracker"):
-                with mock.patch("os.path.exists", side_effect=_fake_exists):
-                    result = self.run_command(["push", self.snap_file])
-
-        self.assertThat(result.exit_code, Equals(0))
-
-        self.assertRegexpMatches(
-            self.fake_logger.output,
-            ".*push '.*test-snap.snap' to the store\.\n"
-            "Revision 9 of 'basic' created\.",
-        )
-        mock_upload.assert_called_once_with("basic", self.snap_file)
-
-        unsquashfs_path = os.path.join(
-            "/snap", "snapcraft", "current", "usr", "bin", "unsquashfs"
-        )
-        self.assertThat(actual_unsquashfs_path, Equals(unsquashfs_path))
 
     def test_push_without_login_must_raise_exception(self):
         raised = self.assertRaises(
@@ -532,6 +472,61 @@ class PushCommandDeltasTestCase(PushCommandBaseTestCase):
                 mock.call("basic", self.snap_file),
                 mock.call().track(),
                 mock.call().raise_for_code(),
+            ]
+        )
+
+    def test_push_with_disabled_delta_falls_back(self):
+        # Upload
+        with mock.patch("snapcraft.storeapi._status_tracker.StatusTracker"):
+            result = self.run_command(["push", self.snap_file])
+        self.assertThat(result.exit_code, Equals(0))
+
+        original_upload = storeapi.StoreClient.upload
+        called = False
+
+        def _fake_upload(self, *args, **kwargs):
+            nonlocal called
+            if called:
+                return original_upload(self, *args, **kwargs)
+            else:
+                called = True
+
+                class _FakeResponse:
+                    status_code = 501
+
+                    def json(self):
+                        return {
+                            "error_list": [
+                                {
+                                    "code": "feature-disabled",
+                                    "message": "The delta upload support is currently disabled.",
+                                }
+                            ]
+                        }
+
+                raise storeapi.errors.StoreServerError(_FakeResponse())
+
+        patcher = mock.patch.object(
+            storeapi.StoreClient, "upload", side_effect=_fake_upload
+        )
+        mock_upload = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # Upload and ensure fallback is called
+        with mock.patch("snapcraft.storeapi._status_tracker.StatusTracker"):
+            result = self.run_command(["push", self.snap_file])
+        self.assertThat(result.exit_code, Equals(0))
+        mock_upload.assert_has_calls(
+            [
+                mock.call(
+                    "basic",
+                    mock.ANY,
+                    delta_format="xdelta3",
+                    delta_hash=mock.ANY,
+                    source_hash=mock.ANY,
+                    target_hash=mock.ANY,
+                ),
+                mock.call("basic", self.snap_file),
             ]
         )
 

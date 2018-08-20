@@ -176,21 +176,45 @@ class SSHKeyFileNotFoundError(_SnapcraftError):
         super().__init__(private_key_file_path=private_key_file_path)
 
 
-class BuildImageForBaseMissing(_SnapcraftError):
+class BuildImageRequestError(_SnapcraftError):
 
     fmt = (
-        "Cannot find a suitable build image to use to create snaps for the "
-        "base {base!r} and architecture {deb_arch!r}.\n"
-        "Contact the creator of {base!r} for further assistance."
+        "Failed to retrieve build image for {base!r}: "
+        "The server responded with HTTP status code {status_code!r}.\n"
+        "Contact the creator of {base!r} for assistance if the issue persists."
     )
 
-    def __init__(self, *, base: str, deb_arch: str) -> None:
-        super().__init__(base=base, deb_arch=deb_arch)
+    def __init__(self, *, base: str, status_code: int) -> None:
+        super().__init__(base=base, status_code=status_code)
+
+
+class BuildImageSetupError(_SnapcraftError):
+
+    fmt = (
+        "Failed to set up the build image for this project: "
+        "The command exited with exit code {exit_code!r}."
+    )
+
+    def __init__(self, *, exit_code: int) -> None:
+        super().__init__(exit_code=exit_code)
+
+
+class BuildImageForBaseMissing(_SnapcraftError):
+    fmt = (
+        "Cannot find suitable build image for base {base!r} and architecture {snap_arch!r}.\n"
+        "Contact the creator of {base!r} for assistance."
+    )
+
+    def __init__(self, *, base: str, snap_arch: str) -> None:
+        super().__init__(base=base, snap_arch=snap_arch)
 
 
 class BuildImageChecksumError(_SnapcraftError):
+    fmt = (
+        "Expected the {algorithm!r} calculated digest for the build image to be {expected!r}, "
+        "but it was {calculated!r}.\n"
+        "Please verify there are no network issues and try again."
+    )
 
-    fmt = "Expected the digest for source to be {expected}, " "but it was {calculated}"
-
-    def __init__(self, expected, calculated):
-        super().__init__(expected=expected, calculated=calculated)
+    def __init__(self, *, expected: str, calculated: str, algorithm: str) -> None:
+        super().__init__(expected=expected, calculated=calculated, algorithm=algorithm)

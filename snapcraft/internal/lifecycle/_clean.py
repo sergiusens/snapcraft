@@ -76,6 +76,11 @@ def _clean_parts(part_names, step, config, staged_state, primed_state):
             )
 
 
+def _remove_directory(directory: str) -> None:
+    if os.path.isdir(directory):
+        shutil.rmtree(directory)
+
+
 def _remove_directory_if_empty(directory):
     if os.path.isdir(directory) and not os.listdir(directory):
         os.rmdir(directory)
@@ -135,6 +140,7 @@ def _cleanup_common_directories_for_step(step, project_options, parts=None):
         _cleanup_parts_dir(
             project_options.parts_dir, project_options.local_plugins_dir, parts
         )
+        _remove_directory(project_options._internal_dir)
 
     if not being_tried:
         _remove_directory_if_empty(project_options.prime_dir)

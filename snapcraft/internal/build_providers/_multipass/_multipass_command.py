@@ -18,7 +18,7 @@ import logging
 import signal
 import shutil
 import subprocess
-from typing import Sequence
+from typing import Any, Callable, List, Union  # noqa: F401
 
 from snapcraft.internal.build_providers import errors
 
@@ -26,12 +26,12 @@ from snapcraft.internal.build_providers import errors
 logger = logging.getLogger(__name__)
 
 
-def _run(command: Sequence) -> None:
+def _run(command: Sequence[str]) -> None:
     logger.debug("Running {}".format(" ".join(command)))
     subprocess.check_call(command)
 
 
-def _run_output(command: Sequence) -> bytes:
+def _run_output(command: Sequence[str]) -> bytes:
     logger.debug("Running {}".format(" ".join(command)))
     return subprocess.check_output(command)
 
@@ -108,15 +108,21 @@ class MultipassCommand:
                 provider_name=self.provider_name, exit_code=process_error.returncode
             ) from process_error
 
-    def execute(self, *, command: Sequence[str], instance_name: str) -> None:
+    def execute(
+        self, *, command: Sequence[str], instance_name: str, hide_output: bool = False
+    ) -> None:
         """Passthrough for running multipass exec.
 
         :param list command: the command to exectute on the instance.
         :param str instance_name: the name of the instance to execute command.
         """
         cmd = [self.provider_cmd, "exec", instance_name, "--"] + command
+        if hide_output:
+            runnable = _run_output  # type: Callable[[List[Any]], Union[bytes, None]]
+        else:
+            runnable = _run
         try:
-            _run(cmd)
+            runnable(cmd)
         except subprocess.CalledProcessError as process_error:
             raise errors.ProviderExecError(
                 provider_name=self.provider_name,

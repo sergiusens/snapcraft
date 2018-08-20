@@ -27,7 +27,9 @@ class Multipass(Provider):
     """A multipass provider for snapcraft to execute its lifecycle."""
 
     def _run(self, command: Sequence[str], hide_output: bool = False) -> None:
-        self._multipass_cmd.execute(instance_name=self.instance_name, command=command)
+        self._multipass_cmd.execute(
+            instance_name=self.instance_name, command=command, hide_output=hide_output
+        )
 
     def _launch(self) -> None:
         self._multipass_cmd.launch(instance_name=self.instance_name, image="16.04")
@@ -46,8 +48,8 @@ class Multipass(Provider):
         destination = "{}:{}".format(self.instance_name, destination)
         self._multipass_cmd.copy_files(source=source, destination=destination)
 
-    def __init__(self, *, project, echoer) -> None:
-        super().__init__(project=project, echoer=echoer)
+    def __init__(self, *, project, echoer, is_ephemeral: bool = False) -> None:
+        super().__init__(project=project, echoer=echoer, is_ephemeral=is_ephemeral)
         self._multipass_cmd = MultipassCommand()
         self._instance_info = None  # type: InstanceInfo
 
@@ -55,7 +57,6 @@ class Multipass(Provider):
         """Create the multipass instance and setup the build environment."""
         self.launch_instance()
         self._instance_info = self._get_instance_info()
-        self.setup_snapcraft()
 
     def destroy(self) -> None:
         """Destroy the instance, trying to stop it first."""

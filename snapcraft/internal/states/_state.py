@@ -88,17 +88,6 @@ def _get_differing_keys(dict1, dict2):
     return differing_keys
 
 
-def set_global_state(state, *, base_dir: str):
-    with open(os.path.join(base_dir, ".global-state"), "w") as state_file:
-        state_file.write(yaml.dump(state))
-
-
-def get_global_state(base_dir: str):
-    os.makedirs(base_dir, exist_ok=True)
-    with open(os.path.join(base_dir, ".global-state")) as state_file:
-        return yaml.load(state_file)
-
-
 def get_state(state_dir: str, step: steps.Step):
     state = None
     state_file = get_step_state_file(state_dir, step)

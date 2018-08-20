@@ -17,6 +17,7 @@ import functools
 import logging
 import os
 import sys
+from distutils import util
 
 import click
 
@@ -29,7 +30,9 @@ from .discovery import discoverycli
 from .lifecycle import lifecyclecli
 from .store import storecli
 from .parts import partscli
+from .inspect import inspectcli
 from .help import helpcli
+from .templates import templatecli
 from .version import versioncli, SNAPCRAFT_VERSION_TEMPLATE
 from .ci import cicli
 from ._command_group import SnapcraftGroup
@@ -46,7 +49,9 @@ command_groups = [
     helpcli,
     lifecyclecli,
     partscli,
+    templatecli,
     versioncli,
+    inspectcli,
 ]
 
 
@@ -55,19 +60,19 @@ command_groups = [
     message=SNAPCRAFT_VERSION_TEMPLATE, version=snapcraft.__version__  # type: ignore
 )
 @add_build_options(hidden=True)
-@click.option("--debug", "-d", is_flag=True, envvar="SNAPCRAFT_DEBUG")
+@click.option("--debug", "-d", is_flag=True)
 @click.pass_context
 def run(ctx, debug, catch_exceptions=False, **kwargs):
     """Snapcraft is a delightful packaging tool."""
 
-    # Since we use entry points, we might not be calling in through __main__
-    if ctx.obj is None:
-        ctx.obj = dict()
-
-    build_environment = BuilderEnvironmentConfig()
-    ctx.obj["BUILD_ENVIRONMENT"] = build_environment
-
-    if build_environment.is_snapcraft_developer_debug:
+    # Debugging snapcraft itself is not tied to debugging a snapcraft project.
+    try:
+        is_snapcraft_developer_debug = util.strtobool(
+            os.getenv("SNAPCRAFT_ENABLE_DEVELOPER_DEBUG", "n")
+        )
+    except ValueError:
+        is_snapcraft_developer_debug = False
+    if is_snapcraft_developer_debug:
         log_level = logging.DEBUG
         click.echo(
             "Starting snapcraft {} from {}.".format(
@@ -76,19 +81,14 @@ def run(ctx, debug, catch_exceptions=False, **kwargs):
         )
     else:
         log_level = logging.INFO
-    # In an ideal world, this logger setup would be replaced
-    log.configure(log_level=log_level)
-
-    # This is a `debug` flag from the point of view of the user of snapcraft
-    # only.
-    if debug:
-        # Setting this here so that tools run within this are also in debug
-        # mode (e.g. snapcraftctl)
-        os.environ["SNAPCRAFT_DEBUG"] = "true"
 
     # Setup global exception handler (to be called for unhandled exceptions)
-    sys.excepthook = functools.partial(exception_handler, debug=debug)
+    sys.excepthook = functools.partial(
+        exception_handler, debug=is_snapcraft_developer_debug
+    )
 
+    # In an ideal world, this logger setup would be replaced
+    log.configure(log_level=log_level)
     # The default command
     if not ctx.invoked_subcommand:
         ctx.forward(lifecyclecli.commands["snap"])

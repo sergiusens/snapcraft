@@ -215,10 +215,13 @@ class ProjectOptions:
         parallel_builds: bool = True,
         target_deb_arch: str = None,
         debug: bool = False,
+        *,
+        project_dir: str = None
     ) -> None:
-        self.project_dir = os.path.expanduser(
-            os.getenv("SNAPCRAFT_PROJECTDIR", os.getcwd())
-        )
+        if project_dir is None:
+            self.project_dir = os.getcwd()
+        else:
+            self.project_dir = project_dir
 
         self.work_dir = os.path.expanduser(
             os.getenv("SNAPCRAFT_WORKDIR", self.project_dir)

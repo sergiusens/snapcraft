@@ -71,10 +71,15 @@ def execute(
 
     installed_snaps = repo.snaps.install_snaps(project_config.build_snaps)
 
-    # states.set_global_state(
-    #    states.GlobalState(installed_packages, installed_snaps),
-    #    base_dir=project_config.project.work_dir)
-    #    )
+    try:
+        global_state = states.GlobalState.load(
+            filepath=project_config.project._global_state_file
+        )
+    except FileNotFoundError:
+        global_state = states.GlobalState()
+    global_state.append_build_packages(installed_packages)
+    global_state.append_build_snaps(installed_snaps)
+    global_state.save(filepath=project_config.project._global_state_file)
 
     if _should_get_core(project_config.data.get("confinement")):
         _setup_core(

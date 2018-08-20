@@ -66,7 +66,7 @@ class ErrorsBaseTestCase(unit.TestCase):
         self.error_mock.assert_not_called
         self.exit_mock.assert_called_once_with(1)
         self.print_exception_mock.assert_called_once_with(
-            RuntimeError, mock.ANY, mock.ANY
+            RuntimeError, mock.ANY, mock.ANY, file=mock.ANY
         )
 
     def assert_no_exception_traceback_exit_1_without_debug(self):
@@ -79,30 +79,11 @@ class ErrorsTestCase(ErrorsBaseTestCase):
     def setUp(self):
         super().setUp()
 
-    def test_handler_traceback_non_snapcraft_exceptions_no_debug(self):
-        """
-        Verify that the traceback is printed only as sentry is disabled.
-        """
-        try:
-            self.call_handler(RuntimeError("not a SnapcraftError"), False)
-        except Exception:
-            self.fail("Exception unexpectedly raised")
-
-        self.assert_exception_traceback_exit_1_with_debug()
-
     @mock.patch.object(snapcraft.cli._errors, "RavenClient")
     def test_handler_no_raven_traceback_non_snapcraft_exceptions_debug(
         self, raven_client_mock
     ):
         snapcraft.cli._errors.RavenClient = None
-        try:
-            self.call_handler(RuntimeError("not a SnapcraftError"), True)
-        except Exception:
-            self.fail("Exception unexpectedly raised")
-
-        self.assert_exception_traceback_exit_1_with_debug()
-
-    def test_handler_raven_but_no_sentry_feature_flag(self):
         try:
             self.call_handler(RuntimeError("not a SnapcraftError"), True)
         except Exception:
@@ -154,7 +135,9 @@ class SendToSentryBaseTest(ErrorsBaseTestCase):
         self.raven_client_mock = patcher.start()
         self.addCleanup(patcher.stop)
 
-        self.useFixture(fixtures.EnvironmentVariable("SNAPCRAFT_ENABLE_SENTRY", "yes"))
+        self.useFixture(
+            fixtures.EnvironmentVariable("SNAPCRAFT_ENABLE_ERROR_REPORTING", "yes")
+        )
 
 
 class SendToSentryIsYesTest(SendToSentryBaseTest):
@@ -175,6 +158,7 @@ class SendToSentryIsYesTest(SendToSentryBaseTest):
         self.raven_client_mock.assert_called_once_with(
             mock.ANY,
             transport=self.raven_request_mock,
+            name="snapcraft",
             processors=mock.ANY,
             auto_log_stacks=False,
         )
@@ -217,6 +201,7 @@ class SendToSentryIsAlwaysTest(SendToSentryBaseTest):
         self.raven_client_mock.assert_called_once_with(
             mock.ANY,
             transport=self.raven_request_mock,
+            name="snapcraft",
             processors=mock.ANY,
             auto_log_stacks=False,
         )
@@ -262,6 +247,7 @@ class SendToSentryAlreadyAlwaysTest(SendToSentryBaseTest):
         self.raven_client_mock.assert_called_once_with(
             mock.ANY,
             transport=self.raven_request_mock,
+            name="snapcraft",
             processors=mock.ANY,
             auto_log_stacks=False,
         )
@@ -285,9 +271,26 @@ class SendToSentryAlreadyAlwaysTest(SendToSentryBaseTest):
         self.raven_client_mock.assert_called_once_with(
             mock.ANY,
             transport=self.raven_request_mock,
+            name="snapcraft",
             processors=mock.ANY,
             auto_log_stacks=False,
         )
 
         # Given the corruption, ensure it hasn't been written to
         self.assertThat(config_path, FileContains("bad data"))
+
+
+class SendToSentryDisabledTest(SendToSentryBaseTest):
+    def test_disabled_no_send(self):
+        self.prompt_mock.return_value = "yes"
+        self.useFixture(
+            fixtures.EnvironmentVariable("SNAPCRAFT_ENABLE_ERROR_REPORTING", "no")
+        )
+
+        try:
+            self.call_handler(RuntimeError("not a SnapcraftError"), True)
+        except Exception:
+            self.fail("Exception unexpectedly raised")
+
+        self.assert_exception_traceback_exit_1_with_debug()
+        self.raven_client_mock.assert_not_called()

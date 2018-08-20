@@ -126,6 +126,7 @@ class TestCase(testscenarios.WithScenarios, testtools.TestCase):
         self.addCleanup(common.set_plugindir, common.get_plugindir())
         self.addCleanup(common.set_schemadir, common.get_schemadir())
         self.addCleanup(common.set_librariesdir, common.get_librariesdir())
+        self.addCleanup(common.set_templatesdir, common.get_templatesdir())
         self.addCleanup(common.reset_env)
         common.set_schemadir(os.path.join(get_snapcraft_path(), "schema"))
         self.fake_logger = fixtures.FakeLogger(level=logging.ERROR)
@@ -134,6 +135,13 @@ class TestCase(testscenarios.WithScenarios, testtools.TestCase):
         patcher = mock.patch("multiprocessing.cpu_count")
         self.cpu_count = patcher.start()
         self.cpu_count.return_value = 2
+        self.addCleanup(patcher.stop)
+
+        # We do not want the paths to affect every test we have.
+        patcher = mock.patch(
+            "snapcraft.file_utils.get_tool_path", side_effect=lambda x: x
+        )
+        patcher.start()
         self.addCleanup(patcher.stop)
 
         patcher = mock.patch(
@@ -155,15 +163,17 @@ class TestCase(testscenarios.WithScenarios, testtools.TestCase):
         # Disable Sentry reporting for tests, otherwise they'll hang waiting
         # for input
         self.useFixture(
-            fixtures.EnvironmentVariable("SNAPCRAFT_ENABLE_SENTRY", "false")
+            fixtures.EnvironmentVariable("SNAPCRAFT_ENABLE_ERROR_REPORTING", "false")
         )
 
         machine = os.environ.get("SNAPCRAFT_TEST_MOCK_MACHINE", None)
         self.base_environment = fixture_setup.FakeBaseEnvironment(machine=machine)
         self.useFixture(self.base_environment)
 
-        # Make sure SNAPCRAFT_DEBUG is reset between tests
-        self.useFixture(fixtures.EnvironmentVariable("SNAPCRAFT_DEBUG"))
+        # Make sure "SNAPCRAFT_ENABLE_DEVELOPER_DEBUG" is reset between tests
+        self.useFixture(
+            fixtures.EnvironmentVariable("SNAPCRAFT_ENABLE_DEVELOPER_DEBUG")
+        )
         self.useFixture(fixture_setup.FakeSnapcraftctl())
 
     def make_snapcraft_yaml(self, content, encoding="utf-8"):

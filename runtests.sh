@@ -57,7 +57,7 @@ parseargs(){
     fi
 }
 
-python3 -m coverage 1>/dev/null 2>&1 && coverage="true"
+coverage 1>/dev/null 2>&1 && coverage="true"
 
 run_static_tests(){
     echo "Running black"
@@ -70,7 +70,7 @@ run_static_tests(){
     mypy -p snapcraft
 
     echo "Running codespell"
-    codespell -S "*.tar,*.xz,*.zip,*.bz2,*.7z,*.gz,*.deb,*.rpm,*.snap,*.gpg,*.pyc,*.png,*.ico,*.jar,./.git,changelog,.mypy_cache,parts,stage,prime" -q4
+    codespell -S "*.tar,*.xz,*.zip,*.bz2,*.7z,*.gz,*.deb,*.rpm,*.snap,*.gpg,*.pyc,*.png,*.ico,*.jar,changelog,.git,.hg,.mypy_cache,.tox,.venv,_build,buck-out,__pycache__,build,dist,.vscode,parts,stage,prime" -q4
 
     echo "Running shellcheck"
     # Need to skip 'demos/gradle/gradlew' as it wasn't written by us and has
@@ -99,7 +99,7 @@ run_spread(){
     export PATH=$TMP_SPREAD:$PATH
     ( cd "$TMP_SPREAD" && curl -s -O https://niemeyer.s3.amazonaws.com/spread-amd64.tar.gz && tar xzvf spread-amd64.tar.gz )
 
-    spread -v linode:
+    spread -v google:
 }
 
 if [ "$test_suite" == "-h" ] || [ "$test_suite" == "--help" ]; then
@@ -110,7 +110,7 @@ fi
 parseargs "$@"
 
 if [[ ! -z "$coverage" ]] && [[ "$test_suite" == "tests/unit"* ]]; then
-    python3 -m coverage report
+    coverage report
 
     echo
     echo "Run 'python3-coverage html' to get a nice report"
