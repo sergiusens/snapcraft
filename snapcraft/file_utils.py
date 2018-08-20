@@ -343,13 +343,16 @@ def get_tool_path(command_name: str) -> str:
     :return: Path to command
     :rtype: str
     """
+    command_path = None
+
     if common.is_snap():
         command_path = _command_path_in_root(os.getenv("SNAP"), command_name)
     elif common.is_docker_instance():
         command_path = _command_path_in_root(
             os.path.join(os.sep, "snap", "snapcraft", "current"), command_name
         )
-    else:
+
+    if command_path is None:
         command_path = shutil.which(command_name)
 
     # shutil.which will return None if it cannot find command_name
@@ -372,7 +375,7 @@ def _command_path_in_root(root, command_name):
         if os.path.exists(path):
             return path
 
-    return ""
+    return None
 
 
 def get_linker_version_from_file(linker_file: str) -> str:
