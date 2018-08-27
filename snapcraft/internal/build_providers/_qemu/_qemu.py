@@ -24,6 +24,7 @@ from typing import Sequence
 
 from ._qemu_driver import MountDevice, QemuDriver
 from ._keys import SSHKey
+from snapcraft.file_utils import get_tool_path
 from snapcraft.internal.build_providers import errors
 from snapcraft.internal.build_providers._base_provider import Provider
 
@@ -220,8 +221,19 @@ class Qemu(Provider):
                 )
 
             cloud_img = os.path.join(cloud_dir, "cloud.img")
-            subprocess.check_call(
-                ["cloud-localds", cloud_img, cloud_config, cloud_meta]
+            genisoimage_cmd = get_tool_path("genisoimage")
+            subprocess.check_output(
+                [
+                    genisoimage_cmd,
+                    "-volid",
+                    "cidata",
+                    "-joliet",
+                    "-rock",
+                    "-output",
+                    cloud_img,
+                    cloud_config,
+                    cloud_meta,
+                ]
             )
             os.makedirs(os.path.dirname(self._cloud_img), exist_ok=True)
             subprocess.check_call(

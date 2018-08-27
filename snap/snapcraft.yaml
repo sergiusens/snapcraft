@@ -44,6 +44,7 @@ parts:
         - apt-utils
         - binutils
         - execstack
+        - genisoimage
         - gpgv
         - libffi6
         - libsodium18
