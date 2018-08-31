@@ -19,6 +19,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from distutils import util
 from textwrap import dedent
 from typing import Sequence
 
@@ -44,12 +45,19 @@ class Qemu(Provider):
         self.setup_disk_image(image_path=self._hda_img)
         self._setup_cloud_img()
         mount_devices = [self._snaps_dir_device_mount, self._project_device_mount]
+
+        try:
+            enable_kvm = util.strtobool(os.getenv("SNAPCRAFT_ENABLE_KVM", "yes"))
+        except ValueError:
+            enable_kvm = True
+
         self._qemu_driver.launch(
             hda=self._hda_img,
             qcow2_drives=[self._cloud_img],
             # TODO RAM adjustments (downscaling).
             ram="2048",
             mount_devices=mount_devices,
+            enable_kvm=enable_kvm,
         )
 
     def _mount(self, *, mountpoint: str, dev_or_path: str) -> None:
