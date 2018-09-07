@@ -12,7 +12,6 @@ from ._fixtures import (  # noqa: F401
     FakeAptCachePackage,
     FakeBaseEnvironment,
     FakeElf,
-    FakeFilesystem,
     FakeLXD,
     FakeMetadataExtractor,
     FakeProjectOptions,
@@ -43,4 +42,5 @@ from ._fixtures import (  # noqa: F401
     TempXDG,
     TestStore,
     WithoutSnapInstalled,
+    FakeExtension,
 )

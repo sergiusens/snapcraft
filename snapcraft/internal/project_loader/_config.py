@@ -28,7 +28,7 @@ from snapcraft.internal import deprecations, remote_parts, states, steps
 
 from ._schema import Validator
 from ._parts_config import PartsConfig
-from ._templates import apply_templates
+from ._extensions import apply_extensions
 from ._env import (
     build_env_for_stage,
     runtime_env,
@@ -207,7 +207,7 @@ class Config:
         self.project = project
 
         # raw_snapcraft_yaml is read only, create a new copy
-        snapcraft_yaml = apply_templates(project.info.get_raw_snapcraft())
+        snapcraft_yaml = apply_extensions(project.info.get_raw_snapcraft())
 
         self.validator = Validator(snapcraft_yaml)
         self.validator.validate()
@@ -236,13 +236,6 @@ class Config:
         self.data["architectures"] = _process_architectures(
             self.data.get("architectures"), project.deb_arch
         )
-
-    def get_metadata(self):
-        return {
-            "name": self.data["name"],
-            "version": self.data.get("version", None),
-            "arch": self.data["architectures"],
-        }
 
     def _ensure_no_duplicate_app_aliases(self):
         # Prevent multiple apps within a snap from having duplicate alias names

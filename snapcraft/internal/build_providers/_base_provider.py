@@ -17,8 +17,9 @@
 import abc
 import logging
 import os
-import shlex
-from typing import Sequence
+import shutil
+from textwrap import dedent
+from typing import Optional, Sequence
 
 from xdg import BaseDirectory
 
@@ -30,21 +31,52 @@ from snapcraft.internal import steps
 logger = logging.getLogger(__name__)
 
 
-class Provider:
+_CLOUD_USER_DATA_TMPL = dedent(
+    """\
+    #cloud-config
+    manage_etc_hosts: true
+    package_update: false
+    growpart:
+        mode: growpart
+        devices: ["/"]
+        ignore_growroot_disabled: false
+    write_files:
+        - path: /etc/skel/.bashrc
+          permissions: 0644
+          content: |
+            export SNAPCRAFT_BUILD_ENVIRONMENT=managed-host
+            export PS1="\h \$(/bin/_snapcraft_prompt)# "
+            export PATH=/snap/bin:$PATH
+        - path: /bin/_snapcraft_prompt
+          permissions: 0755
+          content: |
+            #!/bin/bash
+            if [[ "$PWD" =~ ^$HOME.* ]]; then
+                path="${PWD/#$HOME/\ ..}"
+                if [[ "$path" == " .." ]]; then
+                    ps1=""
+                else
+                    ps1="$path"
+                fi
+            else
+                ps1="$PWD"
+            fi
+            echo -n $ps1
+    """
+)
 
-    __metaclass__ = abc.ABCMeta
+
+class Provider(abc.ABC):
 
     _SNAPS_MOUNTPOINT = os.path.join(os.path.sep, "var", "cache", "snapcraft", "snaps")
+    _INSTANCE_PROJECT_DIR = "~/project"
 
     def __init__(self, *, project, echoer, is_ephemeral: bool = False) -> None:
         self.project = project
         self.echoer = echoer
         self._is_ephemeral = is_ephemeral
 
-        # Once https://github.com/CanonicalLtd/multipass/issues/220 is
-        # closed we can prepend snapcraft- again.
         self.instance_name = "snapcraft-{}".format(project.info.name)
-        self.project_dir = shlex.quote(project.info.name)
 
         if project.info.version:
             self.snap_filename = "{}_{}_{}.snap".format(
@@ -54,14 +86,12 @@ class Provider:
             self.snap_filename = "{}_{}.snap".format(
                 project.info.name, project.deb_arch
             )
-
         self.provider_project_dir = os.path.join(
-            BaseDirectory.save_data_path("snapcraft"), "projects", project.info.name
+            BaseDirectory.save_data_path("snapcraft"),
+            "projects",
+            self._get_provider_name(),
+            project.info.name,
         )
-
-        self.user = "snapcraft"
-        # To be used only inside the provider instance
-        self.project_dir = "~{}/project".format(self.user)
 
     def __enter__(self):
         self.create()
@@ -70,32 +100,13 @@ class Provider:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.destroy()
 
-    @abc.abstractmethod
-    def _run(self, command: Sequence[str], hide_output: bool = False) -> None:
-        """Run a command on the instance."""
+    @abc.abstractclassmethod
+    def _get_provider_name(cls) -> str:
+        """Return the provider name."""
 
-    @abc.abstractmethod
-    def _launch(self):
-        """Launch the instance."""
-
-    @abc.abstractmethod
-    def _mount(self, *, mountpoint: str, dev_or_path: str) -> None:
-        """Mount a path from the host inside the instance."""
-
-    @abc.abstractmethod
-    def _umount(self, *, mountpoint: str) -> None:
-        """Unmount the mountpoint from the instance."""
-
-    @abc.abstractmethod
-    def _mount_snaps_directory(self) -> None:
-        """Mount the host directory with snaps into the provider."""
-
-    def _unmount_snaps_directory(self) -> None:
-        self._umount(mountpoint=self._SNAPS_MOUNTPOINT)
-
-    @abc.abstractmethod
-    def _push_file(self, *, source: str, destination: str) -> None:
-        """Push a file into the instance."""
+    @abc.abstractclassmethod
+    def get_requires_sudo(cls) -> bool:
+        """Return True if the provider requires sudo to run."""
 
     @abc.abstractmethod
     def create(self) -> None:
@@ -110,13 +121,57 @@ class Provider:
         """
 
     @abc.abstractmethod
-    def provision_project(self, tarball: str) -> None:
-        """Provider steps needed to copy project assests to the instance."""
+    def _run(self, command: Sequence[str], hide_output: bool = False) -> None:
+        """Run a command on the instance."""
+
+    @abc.abstractmethod
+    def _launch(self):
+        """Launch the instance."""
+
+    @abc.abstractmethod
+    def _push_file(self, *, source: str, destination: str) -> None:
+        """Push a file into the instance."""
+
+    @abc.abstractmethod
+    def _mount(self, *, mountpoint: str, dev_or_path: str) -> None:
+        """Mount a path from the host inside the instance."""
+
+    @abc.abstractmethod
+    def _umount(self, *, mountpoint: str) -> None:
+        """Unmount the mountpoint from the instance."""
+
+    @abc.abstractmethod
+    def _mount_snaps_directory(self) -> None:
+        """Mount the host directory with snaps into the provider."""
+
+    @abc.abstractmethod
+    def _unmount_snaps_directory(self) -> None:
+        """Unmount the host directory with snaps from the provider."""
 
     @abc.abstractmethod
     def mount_project(self) -> None:
         """Provider steps needed to make the project available to the instance.
         """
+
+    @abc.abstractmethod
+    def provision_project(self, tarball: str) -> None:
+        """Provider steps needed to copy project assests to the instance."""
+
+    def execute_step(self, step: steps.Step) -> None:
+        self._run(command=["snapcraft", step.name])
+
+    def pack_project(self, *, output: Optional[str] = None) -> None:
+        command = ["snapcraft", "snap"]
+        if output:
+            command.extend(["--output", output])
+        self._run(command=command)
+
+    def clean_project(self) -> bool:
+        try:
+            shutil.rmtree(self.provider_project_dir)
+            return True
+        except FileNotFoundError:
+            return False
 
     @abc.abstractmethod
     def build_project(self) -> None:
@@ -149,6 +204,7 @@ class Provider:
         )
 
     def launch_instance(self) -> None:
+        os.makedirs(self.provider_project_dir, exist_ok=True)
         self._launch()
         self._setup_snapcraft()
         first_run_file = os.path.join(self.provider_project_dir, "first_run")
@@ -156,28 +212,33 @@ class Provider:
             self._run(command=["snapcraft", "refresh"])
             open(first_run_file, "w").close()
 
-    def execute_step(self, step: steps.Step) -> None:
-        self._run(command=["snapcraft", step.name])
-
-    def pack_project(self) -> None:
-        self._run(command=["snapcraft", "snap"])
-
     def _setup_snapcraft(self) -> None:
-        if self._is_ephemeral:
-            registry_filepath = None
-        else:
-            registry_filepath = os.path.join(
-                self.provider_project_dir, "snap-registry.yaml"
-            )
+        registry_filepath = os.path.join(
+            self.provider_project_dir, "snap-registry.yaml"
+        )
         snap_injector = SnapInjector(
             snap_dir=self._SNAPS_MOUNTPOINT,
             registry_filepath=registry_filepath,
+            snap_arch=self.project.deb_arch,
             runner=self._run,
             snap_dir_mounter=self._mount_snaps_directory,
             snap_dir_unmounter=self._unmount_snaps_directory,
             file_pusher=self._push_file,
         )
-        snap_injector.add(snap_name="core", snap_arch=self.project.deb_arch)
-        snap_injector.add(snap_name="snapcraft", snap_arch=self.project.deb_arch)
+        snap_injector.add(snap_name="core")
+        snap_injector.add(snap_name="snapcraft")
 
         snap_injector.apply()
+
+    def _get_cloud_user_data(self) -> str:
+        # TODO support users for the qemu provider.
+        cloud_user_data_filepath = os.path.join(
+            self.provider_project_dir, "user-data.yaml"
+        )
+        if os.path.exists(cloud_user_data_filepath):
+            return cloud_user_data_filepath
+
+        with open(cloud_user_data_filepath, "w") as cloud_user_data_file:
+            print(_CLOUD_USER_DATA_TMPL, file=cloud_user_data_file)
+
+        return cloud_user_data_filepath

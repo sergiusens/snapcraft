@@ -139,7 +139,7 @@ class QemuDriver:
                 provider_name=self.provider_name, command=command, exit_code=exit_code
             )
 
-    def shell(self, project_dir: str) -> None:
+    def shell(self) -> None:
         channel = self._get_ssh_shell()
         channel.invoke_shell()
         try:

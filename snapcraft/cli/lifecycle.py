@@ -17,6 +17,7 @@
 import os
 import subprocess
 import sys
+import typing
 
 import click
 
@@ -34,6 +35,9 @@ from snapcraft.internal import (
 )
 from snapcraft.project.errors import YamlValidationError
 
+if typing.TYPE_CHECKING:
+    from snapcraft.internal.project import Project  # noqa: F401
+
 
 def _run_sudo():
     try:
@@ -44,18 +48,28 @@ def _run_sudo():
         )
 
 
-def _execute(
-    step, parts, shell=False, shell_after=False, instance_pack=False, **kwargs
-):
-    project = get_project(**kwargs)
+# TODO: when snap is a real step we can simplify the arguments here.
+# fmt: off
+def _execute(  # noqa: C901
+    step: steps.Step,
+    parts: str,
+    shell: bool = False,
+    shell_after: bool = False,
+    pack_project: bool = False,
+    output: str = None,
+    **kwargs
+) -> "Project":
+    # fmt: on
     build_environment = env.BuilderEnvironmentConfig()
+    project = get_project(is_managed_host=build_environment.is_managed_host, **kwargs)
 
-    # After the swap, the trigger will be based on `base` where the
-    # default build environment will be something that triggers the
-    # build provider.
-    if build_environment.is_qemu:
-        build_provider_class = build_providers.get_provider_for("qemu")
-        if build_provider_class.requires_sudo:
+    if project.info.base is not None and not (
+        build_environment.is_host or build_environment.is_managed_host
+    ):
+        build_provider_class = build_providers.get_provider_for(
+            build_environment.provider
+        )
+        if build_provider_class.get_requires_sudo():  # type: ignore
             echo.info("Launching a VM with sudo.")
             _run_sudo()
         else:
@@ -63,27 +77,36 @@ def _execute(
         with build_provider_class(project=project, echoer=echo) as instance:
             instance.mount_project()
             try:
-                if instance_pack:
-                    instance.pack_project()
+                if pack_project:
+                    instance.pack_project(output=output)
                 else:
                     instance.execute_step(step)
-                if shell_after:
-                    echo.info("Dropping into a shell.")
+                if shell:
+                    echo.warning("Use of --shell is still not supported")
+                elif shell_after:
                     instance.shell()
             except Exception as e:
                 if project.debug:
-                    echo.warning("An error occurred. Dropping into a debug shell.")
                     instance.shell()
-                    echo.info("Exiting...")
                 else:
+                    echo.warning("You can run the command with --debug again to shell into the environment")
                     raise e
-    elif build_environment.is_host:
+    elif build_environment.is_managed_host or build_environment.is_host:
         project_config = project_loader.load_config(project)
         lifecycle.execute(step, project_config, parts)
+        if pack_project:
+            _pack(project.prime_dir, output=output)
     else:
         # containerbuild takes a snapcraft command name, not a step
-        lifecycle.containerbuild(step.name, project_config, parts)
+        lifecycle.containerbuild(command=step.name, project=project, args=parts)
+        if pack_project:
+            _pack(project.prime_dir, output=output)
     return project
+
+
+def _pack(directory: str, *, output: str) -> None:
+    snap_name = lifecycle.pack(directory, output)
+    echo.info("Snapped {}".format(snap_name))
 
 
 @click.group()
@@ -177,18 +200,11 @@ def snap(directory, output, **kwargs):
     If you want to snap a directory, you should use the pack command
     instead.
     """
-    build_environment = env.BuilderEnvironmentConfig()
-    instance_pack = build_environment.is_qemu
-
     if directory:
         deprecations.handle_deprecation_notice("dn6")
+        _pack(directory, output=output)
     else:
-        project = _execute(steps.PRIME, parts=[], instance_pack=instance_pack, **kwargs)
-        directory = project.prime_dir
-
-    if not instance_pack:
-        snap_name = lifecycle.pack(directory, output)
-        echo.info("Snapped {}".format(snap_name))
+        _execute(steps.PRIME, parts=[], pack_project=True, output=output, **kwargs)
 
 
 @lifecyclecli.command()
@@ -206,8 +222,7 @@ def pack(directory, output, **kwargs):
         snapcraft pack my-snap-directory --output renamed-snap.snap
 
     """
-    snap_name = lifecycle.pack(directory, output)
-    echo.info("Snapped {}".format(snap_name))
+    _pack(directory, output=output)
 
 
 @lifecyclecli.command()
@@ -228,12 +243,18 @@ def clean(parts, step_name, **kwargs):
         snapcraft clean
         snapcraft clean my-part --step build
     """
+    build_environment = env.BuilderEnvironmentConfig()
     try:
-        project = get_project(**kwargs)
+        project = get_project(
+            is_managed_host=build_environment.is_managed_host, **kwargs
+        )
     except YamlValidationError:
         # We need to be able to clean invalid projects too.
-        project = get_project(skip_snapcraft_yaml=True, **kwargs)
-    build_environment = env.BuilderEnvironmentConfig()
+        project = get_project(
+            is_managed_host=build_environment.is_managed_host,
+            skip_snapcraft_yaml=True,
+            **kwargs,
+        )
 
     step = None
     if step_name:
@@ -244,20 +265,22 @@ def clean(parts, step_name, **kwargs):
             step_name = "prime"
         step = steps.get_step_by_name(step_name)
 
-    if project.info.base is not None and build_environment.is_qemu:
-        build_provider_class = build_providers.get_provider_for("qemu")
-        build_project = build_provider_class(project=project, echoer=echo)
-        build_project.clean_project()
+    if build_environment.is_lxd:
+        lxd.Project(project=project, output=None, source=os.path.curdir).clean(
+            parts, step
+        )
     elif build_environment.is_host:
         lifecycle.clean(project, parts, step)
     else:
-        project_config = project_loader.load_config(project)
-        lxd.Project(
-            project_options=project,
-            output=None,
-            source=os.path.curdir,
-            metadata=project_config.get_metadata(),
-        ).clean(parts, step)
+        # TODO support for steps.
+        if parts or step_name:
+            raise errors.SnapcraftEnvironmentError(
+                "Build providers are still not feature complete, specifying parts or a step name "
+                "is not yet supported.")
+        build_provider_class = build_providers.get_provider_for(
+            build_environment.provider
+        )
+        build_provider_class(project=project, echoer=echo).clean_project()
 
 
 @lifecyclecli.command()
@@ -286,8 +309,6 @@ def cleanbuild(remote, debug, **kwargs):
     If using a remote, a prior setup is required which is described on:
     https://linuxcontainers.org/lxd/getting-started-cli/#multiple-hosts
     """
-    project = get_project(**kwargs, debug=debug)
-    project_config = project_loader.load_config(project)
     # cleanbuild is a special snow flake, while all the other commands
     # would work with the host as the build_provider it makes little
     # sense in this scenario.
@@ -299,14 +320,14 @@ def cleanbuild(remote, debug, **kwargs):
     build_environment = env.BuilderEnvironmentConfig(
         default=default_provider, additional_providers=["multipass"]
     )
-
-    lifecycle.cleanbuild(
-        project=project,
-        project_config=project_config,
-        echoer=echo,
-        remote=remote,
-        build_environment=build_environment,
+    project = get_project(
+        is_managed=build_environment.is_managed_host, **kwargs, debug=debug
     )
+
+    snap_filename = lifecycle.cleanbuild(
+        project=project, echoer=echo, remote=remote, build_environment=build_environment
+    )
+    echo.info("Retrieved {!r}".format(snap_filename))
 
 
 if __name__ == "__main__":

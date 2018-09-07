@@ -17,7 +17,7 @@
 import click
 import os
 
-from snapcraft.internal import lxd, project_loader, repo
+from snapcraft.internal import lxd, repo
 from ._options import get_project
 from . import env
 
@@ -32,7 +32,7 @@ def containerscli():
     "--debug", is_flag=True, help="Shells into the environment if the build fails."
 )
 def refresh(debug, **kwargs):
-    """Refresh the build packages cache.
+    """Refresh an existing LXD container.
 
     \b
     Examples:
@@ -45,12 +45,6 @@ def refresh(debug, **kwargs):
     build_environment = env.BuilderEnvironmentConfig()
     if build_environment.is_lxd:
         project = get_project(**kwargs, debug=debug)
-        config = project_loader.load_config(project)
-        lxd.Project(
-            project_options=project,
-            output=None,
-            source=os.path.curdir,
-            metadata=config.get_metadata(),
-        ).refresh()
+        lxd.Project(project=project, output=None, source=os.path.curdir).refresh()
     else:
         repo.Repo.refresh_build_packages()

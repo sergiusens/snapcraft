@@ -41,6 +41,7 @@ class ProjectInfo:
         self.summary = self.__raw_snapcraft.get("summary")
         self.description = self.__raw_snapcraft.get("description")
         self.confinement = self.__raw_snapcraft.get("confinement")
+        self.architectures = self.__raw_snapcraft.get("architectures")
         self.grade = self.__raw_snapcraft.get("grade")
         self.base = self.__raw_snapcraft.get("base")
 
@@ -72,6 +73,12 @@ def _load_yaml(*, yaml_file_path: str) -> OrderedDict:
         raise errors.YamlValidationError(
             "Invalid character {!r} at position {} of {}: {}".format(
                 chr(e.character), e.position + 1, yaml_file_path, e.reason
+            )
+        ) from e
+    except yaml.constructor.ConstructorError as e:
+        raise errors.YamlValidationError(
+            "{}, line {}, column {}".format(
+                e.problem, e.problem_mark.line + 1, e.problem_mark.column + 1
             )
         ) from e
 

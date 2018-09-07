@@ -23,6 +23,8 @@ from distutils import util
 from textwrap import dedent
 from typing import Sequence
 
+import yaml
+
 from ._qemu_driver import MountDevice, QemuDriver
 from ._keys import SSHKey
 from snapcraft.file_utils import get_tool_path
@@ -36,7 +38,13 @@ logger = logging.getLogger(__name__)
 class Qemu(Provider):
     """A multipass provider for snapcraft to execute its lifecycle."""
 
-    requires_sudo = True
+    @classmethod
+    def _get_provider_name(cls) -> str:
+        return "qemu"
+
+    @classmethod
+    def get_requires_sudo(cls) -> bool:
+        return True
 
     def _run(self, command: Sequence[str], hide_output: bool = False) -> None:
         self._qemu_driver.execute(command=command, hide_output=hide_output)
@@ -86,11 +94,23 @@ class Qemu(Provider):
             dev_or_path=self._snaps_dir_device_mount.mount_tag,
         )
 
+    def _unmount_snaps_directory(self):
+        self._umount(mountpoint=self._SNAPS_MOUNTPOINT)
+
     def _push_file(self, *, source: str, destination: str) -> None:
         self._qemu_driver.push_file(source=source, destination=destination)
 
+    def provision_project(self):
+        raise NotImplementedError()
+
+    def build_project(self):
+        raise NotImplementedError()
+
+    def retrieve_snap(self) -> str:
+        raise NotImplementedError()
+
     def shell(self) -> None:
-        self._qemu_driver.shell(self.project_dir)
+        self._qemu_driver.shell()
 
     def __init__(self, *, project, echoer) -> None:
         super().__init__(project=project, echoer=echoer)
@@ -99,7 +119,7 @@ class Qemu(Provider):
         self._cloud_img = os.path.join(self.provider_project_dir, "cloud.qcow2")
 
         self._project_device_mount = MountDevice(
-            host_path=self.project.project_dir,
+            host_path=self.project._project_dir,
             dev="project_device",
             mount_tag="project_mount",
         )
@@ -119,7 +139,7 @@ class Qemu(Provider):
         self._ssh_key = ssh_key
 
         self._qemu_driver = QemuDriver(
-            ssh_username=self.user, ssh_key_file=self._ssh_key.private_key_file_path
+            ssh_username="snapcraft", ssh_key_file=self._ssh_key.private_key_file_path
         )
 
     def create(self) -> None:
@@ -128,12 +148,12 @@ class Qemu(Provider):
 
     def destroy(self) -> None:
         """Destroy the instance, trying to stop it first."""
-        self._umount(mountpoint=self.project_dir)
+        self._umount(mountpoint=self.project._project_dir)
         self._qemu_driver.stop()
 
     def mount_project(self) -> None:
         self._mount(
-            mountpoint=self.project_dir,
+            mountpoint=self.project._project_dir,
             dev_or_path=self._project_device_mount.mount_tag,
         )
 
@@ -159,74 +179,22 @@ class Qemu(Provider):
                     file=cloud_meta_file,
                 )
             cloud_config = os.path.join(cloud_dir, "user-data")
-            with open(cloud_config, "w") as cloud_config_file:
-                print(
-                    dedent(
-                        """\
-                    #cloud-config
-                    manage_etc_hosts: true
-                    package_update: false
-                    growpart:
-                        mode: growpart
-                        devices: ["/"]
-                        ignore_growroot_disabled: false
-                    users:
-                        - name: {user}
-                          gecos: snap build user
-                          shell: /bin/bash
-                          sudo: ALL=(ALL) NOPASSWD:ALL
-                          lock_passwd: true
-                          ssh-authorized-keys:
-                            - {public_key}
-                    write_files:
-                        - path: /bin/snapcraft
-                          permissions: 0755
-                          content: |
-                            #!/bin/sh
-
-                            set -e
-
-                            # Make sure we operate in inside-VM mode.
-                            export SNAPCRAFT_WORKDIR="~"
-                            export SNAPCRAFT_PROJECTDIR="{project_dir}"
-
-                            mkdir -p {project_dir}
-                            cd {project_dir}
-
-                            exec /snap/bin/snapcraft "$@"
-                        - path: /etc/skel/.bashrc
-                          permissions: 0644
-                          content: |
-                            export SNAPCRAFT_WORKDIR="~"
-                            export SNAPCRAFT_PROJECTDIR="{project_dir}"
-
-                            export PS1="\h \$(/bin/_snapcraft_prompt)# "
-                        - path: /bin/_snapcraft_prompt
-                          permissions: 0755
-                          content: |
-                            #!/bin/bash
-
-                            if [[ "$PWD" =~ ^$HOME.* ]]; then
-                                path="${{PWD/#$HOME/\ ..}}"
-                                if [[ "$path" == " .." ]]; then
-                                    ps1=""
-                                else
-                                    ps1="$path"
-                                fi
-                            else
-                                ps1="$PWD"
-                            fi
-
-                            echo -n $ps1
-                """
-                    ).format(
-                        user=self.user,
-                        project_name=self.project.info.name,
-                        project_dir=self.project_dir,
-                        public_key=public_key,
-                    ),
-                    file=cloud_config_file,
-                )
+            cloud_config_default = self._get_cloud_user_data()
+            with open(cloud_config_default) as default_cloud_config_file:
+                data = yaml.load(default_cloud_config_file)
+                data["users"] = [
+                    {
+                        "name": "snapcraft",
+                        "gecos": "snap build user",
+                        "shell": "/bin/bash",
+                        "sudo": "ALL=(ALL) NOPASSWD:ALL",
+                        "lock_passwd": True,
+                        "ssh-authorized-keys": [public_key],
+                    }
+                ]
+                with open(cloud_config, "w") as cloud_config_file:
+                    print("#cloud-config", file=cloud_config_file)
+                    yaml.dump(data, stream=cloud_config_file)
 
             cloud_img = os.path.join(cloud_dir, "cloud.img")
             genisoimage_cmd = get_tool_path("genisoimage")
@@ -237,6 +205,7 @@ class Qemu(Provider):
                     "cidata",
                     "-joliet",
                     "-rock",
+                    "-quiet",
                     "-output",
                     cloud_img,
                     cloud_config,

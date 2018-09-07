@@ -22,7 +22,7 @@ from typing import Dict
 import requests
 
 from . import errors
-from snapcraft.file_utils import calculate_hash, get_tool_path
+from snapcraft.file_utils import calculate_hash
 from snapcraft.internal.cache import FileCache
 from snapcraft.internal.indicators import download_requests_stream
 
@@ -134,7 +134,6 @@ def setup(*, base: str, snap_arch: str, size: str, image_path: str) -> None:
 
     if os.path.dirname(image_path):
         os.makedirs(os.path.dirname(image_path), exist_ok=True)
-    qemu_img_cmd = get_tool_path("qemu-img")
     # qemu-img parameters:
     # -q: quiet.
     # -f: first image format.
@@ -142,7 +141,7 @@ def setup(*, base: str, snap_arch: str, size: str, image_path: str) -> None:
     try:
         subprocess.check_call(
             [
-                qemu_img_cmd,
+                "qemu-img",
                 "create",
                 "-q",
                 "-f",
