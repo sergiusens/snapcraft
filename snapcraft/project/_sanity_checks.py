@@ -44,6 +44,12 @@ def conduct_project_sanity_check(project: snapcraft.project.Project):
     if os.path.isdir(snap_dir_path):
         _check_snap_dir(snap_dir_path)
 
+    if project.info is not None and project.info.base is not None:
+        # TODO mention build VM and/or snapcraft 3.0
+        logger.warn(
+            "Use of the 'base' keyword is not feature complete on this version of snapcraft."
+        )
+
 
 def _check_snap_dir(snap_dir_path: str):
     unexpected_paths = set()
