@@ -29,6 +29,12 @@ from snapcraft.internal import errors
 logger = logging.getLogger(__name__)
 
 
+_PATCHELF_INCOMPATIBLE_SONAMES = (
+    # patchelf breaks latest versions of libnode
+    "libnode.so",
+)
+
+
 def is_go_based_plugin(plugin):
     """Returns True if plugin is a go based one.
 
@@ -120,6 +126,9 @@ class PartPatcher:
         # environment is consistent and the chain of dlopens that may
         # happen remains sane.
         for elf_file in self._elf_files:
+            if elf_file.soname in _PATCHELF_INCOMPATIBLE_SONAMES:
+                logger.debug("Skipping patchelf for {!r}".format(elf_file.soname))
+                continue
             try:
                 elf_patcher.patch(elf_file=elf_file)
             except errors.PatcherError as patch_error:
