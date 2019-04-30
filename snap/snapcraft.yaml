@@ -101,8 +101,8 @@ parts:
 
   legacy-snapcraft:
     plugin: python
-    source: https://github.com/snapcore/snapcraft.git
-    source-branch: legacy
+    source: https://github.com/sergiusens/snapcraft.git
+    source-branch: legacy-patchelf-node-quirk
     source-depth: 1
     requirements:
         - requirements.txt
