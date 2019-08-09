@@ -36,6 +36,7 @@ from testtools.matchers import (
     Not,
 )
 
+from snapcraft.internal.meta.app import errors as app_errors
 from snapcraft.internal.meta import _errors as meta_errors, _snap_packaging
 from snapcraft import extractors, yaml_utils
 from snapcraft.project import Project
@@ -1802,7 +1803,8 @@ class FullAdapterTest(unit.TestCase):
         self.snapcraft_yaml["apps"]["app"]["command"] = "invalid'app"
 
         raised = self.assertRaises(
-            errors.InvalidAppCommandFormatError, self._get_packager().write_snap_yaml
+            app_errors.InvalidAppCommandFormatError,
+            self._get_packager().write_snap_yaml,
         )
         self.assertThat(raised.command, Equals("invalid'app"))
         self.assertThat(raised.app_name, Equals("app"))
@@ -1811,7 +1813,8 @@ class FullAdapterTest(unit.TestCase):
         self.snapcraft_yaml["apps"]["app"]["command"] = "/test-command"
 
         raised = self.assertRaises(
-            errors.InvalidAppCommandFormatError, self._get_packager().write_snap_yaml
+            app_errors.InvalidAppCommandFormatError,
+            self._get_packager().write_snap_yaml,
         )
         self.assertThat(raised.command, Equals("/test-command"))
         self.assertThat(raised.app_name, Equals("app"))
@@ -1835,7 +1838,8 @@ class FullAdapterTest(unit.TestCase):
         _create_file(os.path.join(self.prime_dir, "test-command"), executable=False)
 
         raised = self.assertRaises(
-            errors.InvalidAppCommandNotExecutable, self._get_packager().write_snap_yaml
+            app_errors.InvalidAppCommandNotExecutable,
+            self._get_packager().write_snap_yaml,
         )
         self.assertThat(raised.command, Equals("test-command"))
         self.assertThat(raised.app_name, Equals("app"))
@@ -1974,7 +1978,7 @@ class CommandChainTest(unit.TestCase):
 
     def test_missing_command_chain(self):
         raised = self.assertRaises(
-            errors.InvalidCommandChainError, self._get_packager().write_snap_yaml
+            app_errors.InvalidCommandChainError, self._get_packager().write_snap_yaml
         )
         self.assertThat(raised.item, Equals("test-chain"))
         self.assertThat(raised.app_name, Equals("app"))
@@ -1983,7 +1987,7 @@ class CommandChainTest(unit.TestCase):
         cmd_path = os.path.join(self.prime_dir, "test-chain")
         _create_file(cmd_path, executable=False)
         raised = self.assertRaises(
-            errors.InvalidCommandChainError, self._get_packager().write_snap_yaml
+            app_errors.InvalidCommandChainError, self._get_packager().write_snap_yaml
         )
         self.assertThat(raised.item, Equals("test-chain"))
         self.assertThat(raised.app_name, Equals("app"))

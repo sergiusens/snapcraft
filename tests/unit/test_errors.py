@@ -291,45 +291,6 @@ class ErrorFormattingTestCase(unit.TestCase):
             },
         ),
         (
-            "InvalidAppCommandNotExecutable",
-            {
-                "exception": errors.InvalidAppCommandNotExecutable,
-                "kwargs": {"command": "test-command", "app_name": "test-app"},
-                "expected_message": (
-                    "Failed to generate snap metadata: "
-                    "The specified command 'test-command' defined in the app "
-                    "'test-app' is not executable."
-                ),
-            },
-        ),
-        (
-            "InvalidAppCommandFormatError",
-            {
-                "exception": errors.InvalidAppCommandFormatError,
-                "kwargs": {"command": "test-command", "app_name": "test-app"},
-                "expected_message": (
-                    "Failed to generate snap metadata: "
-                    "The specified command 'test-command' defined in the app "
-                    "'test-app' does not match the pattern expected by snapd.\n"
-                    "The command must consist only of alphanumeric characters, spaces, "
-                    "and the following special characters: / . _ # : $ -"
-                ),
-            },
-        ),
-        (
-            "InvalidCommandChainError",
-            {
-                "exception": errors.InvalidCommandChainError,
-                "kwargs": {"item": "test-chain", "app_name": "test-app"},
-                "expected_message": (
-                    "Failed to generate snap metadata: "
-                    "The command-chain item 'test-chain' defined in the app 'test-app' "
-                    "does not exist or is not executable.\n"
-                    "Ensure that 'test-chain' is relative to the prime directory."
-                ),
-            },
-        ),
-        (
             "InvalidDesktopFileError",
             {
                 "exception": errors.InvalidDesktopFileError,
