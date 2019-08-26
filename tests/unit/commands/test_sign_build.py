@@ -76,7 +76,7 @@ class SignBuildTestCase(CommandBaseTestCase):
 
         self.assertThat(result.exit_code, Equals(2))
         self.assertThat(
-            result.output, Contains('Path "nonexisting.snap" does not exist')
+            result.output, Contains('File "nonexisting.snap" does not exist')
         )
         self.assertThat(mock_check_output.call_count, Equals(0))
 

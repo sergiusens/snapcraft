@@ -1,4 +1,10 @@
-snapcraft (2.44) xenial; urgency=medium
+snapcraft (2.44+19.10ubuntu1) eoan; urgency=medium
+
+  * unit tests: update for package set in eoan
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Mon, 26 Aug 2019 01:59:51 +0000
+
+snapcraft (2.44+19.10) eoan; urgency=medium
 
   [ Sergio Schvezov ]
   * docker: support for testing snapcraft in proposed (#2245)
