@@ -1,3 +1,9 @@
+snapcraft (2.44+19.10ubuntu2) UNRELEASED; urgency=medium
+
+  * spread: update adhoc provider with newer Ubuntu series
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Tue, 27 Aug 2019 09:14:39 +0000
+
 snapcraft (2.44+19.10ubuntu1) eoan; urgency=medium
 
   * unit tests: update for package set in eoan

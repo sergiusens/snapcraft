@@ -76,22 +76,6 @@ backends:
       - ubuntu-16.04-arm64:
           username: ubuntu
           password: ubuntu
-      # Artful
-      - ubuntu-17.10-amd64:
-          username: ubuntu
-          password: ubuntu
-      - ubuntu-17.10-i386:
-          username: ubuntu
-          password: ubuntu
-      - ubuntu-17.10-ppc64el:
-          username: ubuntu
-          password: ubuntu
-      - ubuntu-17.10-armhf:
-          username: ubuntu
-          password: ubuntu
-      - ubuntu-17.10-s390x:
-          username: ubuntu
-          password: ubuntu
       # Bionic
       - ubuntu-18.04-amd64:
           username: ubuntu
@@ -128,6 +112,38 @@ backends:
           username: ubuntu
           password: ubuntu
       - ubuntu-18.10-arm64:
+          username: ubuntu
+          password: ubuntu
+      # Disco
+      - ubuntu-19.04-amd64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.04-i386:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.04-ppc64el:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.04-armhf:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.04-s390x:
+          username: ubuntu
+          password: ubuntu
+      # Eoan
+      - ubuntu-19.10-amd64:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.10-i386:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.10-ppc64el:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.10-armhf:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.10-s390x:
           username: ubuntu
           password: ubuntu
 
