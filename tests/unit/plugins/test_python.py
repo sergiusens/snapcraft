@@ -416,6 +416,22 @@ class PythonPluginTestCase(BasePythonPluginTestCase):
             plugin.plugin_stage_packages, Equals(["python3", "python3-distutils"])
         )
 
+    def test_plugin_stage_packages_python2_eoan(self):
+        self.options.python_version = "python2"
+        self.mock_os_release.return_value.version_codename.return_value = "eoan"
+
+        plugin = python.PythonPlugin("test-part", self.options, self.project_options)
+        self.assertThat(plugin.plugin_stage_packages, Equals(["python"]))
+
+    def test_plugin_stage_packages_python3_eoan(self):
+        self.options.python_version = "python3"
+        self.mock_os_release.return_value.version_codename.return_value = "eoan"
+
+        plugin = python.PythonPlugin("test-part", self.options, self.project_options)
+        self.assertThat(
+            plugin.plugin_stage_packages, Equals(["python3", "python3-distutils"])
+        )
+
     def test_no_python_packages_does_nothing(self):
         # This should be an error but given that we default to
         # 'source: .' and now that pip 10 has been released
