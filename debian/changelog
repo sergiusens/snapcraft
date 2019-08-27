@@ -3,6 +3,7 @@ snapcraft (2.44+19.10ubuntu2) UNRELEASED; urgency=medium
   * spread: update adhoc provider with newer Ubuntu series
   * python plugin: install python3-distutils when series is != xenial
   * rust plugin: support for s390x
+  * integration tests: remove obsolete system library test
 
  -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Tue, 27 Aug 2019 09:14:39 +0000
 
