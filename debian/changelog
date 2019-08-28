@@ -1,4 +1,4 @@
-snapcraft (2.44+19.10ubuntu4) UNRELEASED; urgency=medium
+snapcraft (2.44+19.10ubuntu4) eoan; urgency=medium
 
   * integration tests: disable review tools checks on s390x
 
