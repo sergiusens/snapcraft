@@ -12,7 +12,7 @@ restore: |
   cd "$SNAP_DIR"
   snapcraft clean
   rm -f ./*.snap
-  git checkout snap/snapcraft.yaml
+  sed -i -e "s/confinement: classic/confinement: strict/" snap/snapcraft.yaml
 
 execute: |
   cd "$SNAP_DIR"
