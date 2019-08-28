@@ -130,6 +130,9 @@ backends:
       - ubuntu-19.04-s390x:
           username: ubuntu
           password: ubuntu
+      - ubuntu-19.04-arm64:
+          username: ubuntu
+          password: ubuntu
       # Eoan
       - ubuntu-19.10-amd64:
           username: ubuntu
@@ -144,6 +147,9 @@ backends:
           username: ubuntu
           password: ubuntu
       - ubuntu-19.10-s390x:
+          username: ubuntu
+          password: ubuntu
+      - ubuntu-19.10-arm64:
           username: ubuntu
           password: ubuntu
 

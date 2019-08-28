@@ -1,3 +1,9 @@
+snapcraft (2.44+19.10ubuntu3) UNRELEASED; urgency=medium
+
+  * spread: add provider for adhoc arm64 on Disco and Eoan
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Wed, 28 Aug 2019 03:23:29 +0000
+
 snapcraft (2.44+19.10ubuntu2) eoan; urgency=medium
 
   [ Sergio Schvezov ]
