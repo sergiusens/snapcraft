@@ -41,20 +41,25 @@ class AssetRecordingBaseTestCase(integration.TestCase):
     def setUp(self):
         super().setUp()
         # The combination of snapd, lxd and armhf does not currently work.
-        if os.environ.get("ADT_TEST") and self.deb_arch == "armhf":
+        if os.environ.get("ADT_TEST") and self.deb_arch in ("armhf"):
             self.skipTest("The autopkgtest armhf runners can't install snaps")
 
         self.useFixture(fixtures.EnvironmentVariable("SNAPCRAFT_BUILD_INFO", "1"))
 
-        try:
-            subprocess.check_output(["snap", "list", "review-tools"])
-        except subprocess.CalledProcessError:
-            subprocess.check_call(["sudo", "snap", "install", "review-tools", "--edge"])
+        # Skip tool installation on s390x as it is currently not available there.
+        if self.deb_arch != "s390x":
+            try:
+                subprocess.check_output(["snap", "list", "review-tools"])
+            except subprocess.CalledProcessError:
+                subprocess.check_call(["sudo", "snap", "install", "review-tools", "--edge"])
 
     def assert_review_passes(self, snap_file: str) -> None:
         # See https://forum.snapcraft.io/t/7339 for more info on why review verification
         # is skipped on non xenial environments.
         if os_release.get_version_codename() != "xenial":
+            return
+        # Skip tool runt on s390x as it is currently not available there.
+        if self.deb_arch == "s390x":
             return
 
         # review-tools do not really have access to tmp, let's assume it can look

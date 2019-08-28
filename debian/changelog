@@ -1,3 +1,9 @@
+snapcraft (2.44+19.10ubuntu4) UNRELEASED; urgency=medium
+
+  * integration tests: disable review tools checks on s390x
+
+ -- Sergio Schvezov <sergio.schvezov@ubuntu.com>  Wed, 28 Aug 2019 20:15:31 +0000
+
 snapcraft (2.44+19.10ubuntu3) eoan; urgency=medium
 
   * spread: add provider for adhoc arm64 on Disco and Eoan
