@@ -1,4 +1,4 @@
-snapcraft (2.44+19.10ubuntu3) UNRELEASED; urgency=medium
+snapcraft (2.44+19.10ubuntu3) eoan; urgency=medium
 
   * spread: add provider for adhoc arm64 on Disco and Eoan
   * spread: filter cross compilation tests
