@@ -1,8 +1,8 @@
-snapcraft (2.44+19.10ubuntu5) UNRELEASED; urgency=medium
+snapcraft (2.44+19.10ubuntu5) eoan; urgency=medium
 
   * spread: filter cross compilation tests for autotools
 
- -- Sergio Schvezov <sergio.schvezov@canonical.com>  Thu, 29 Aug 2019 09:47:36 +0000
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Thu, 29 Aug 2019 09:55:56 +0000
 
 snapcraft (2.44+19.10ubuntu4) eoan; urgency=medium
 
