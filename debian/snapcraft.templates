@@ -1,0 +1,15 @@
+Template: snapcraft/snap-no-connectivity
+Type: select
+Choices: Retry, Abort, Skip
+_Description: Unable to reach the snap store
+ Your system is unable to reach the snap store, please make sure you're
+ connected to the Internet and update any firewall or proxy settings as
+ needed so that you can reach the snap store.
+ .
+ You can manually check for connectivity by running "snap info snapcraft"
+ .
+ Aborting will cause the upgrade to fail and will require it to be re-attempted
+ once snapd is functional on the system.
+ .
+ Skipping will let the package upgrade continue but the Snapcraft commands
+ will not be functional until the Snapcraft snap is installed.

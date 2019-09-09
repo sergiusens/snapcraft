@@ -1,4 +1,0 @@
-include libraries/*
-include schema/*
-include templates/*
-include debian/changelog

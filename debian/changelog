@@ -1,3 +1,16 @@
+snapcraft (3.0) eoan; urgency=medium
+
+  * switch to snap:
+    - Empty source package
+    - Switch version to 3
+    - Set debian/compat to 11
+    - Set Standards-Version to 4.2.1
+    - Update source Homepage
+    - Add dummy snapcraft binaries that re-exec the snap
+    - Add transitional packages for snapcraft- binary debs
+
+ -- Sergio Schvezov <sergio.schvezov@canonical.com>  Mon, 9 Sep 2019 09:55:56 +0000
+
 snapcraft (2.44+19.10ubuntu5) eoan; urgency=medium
 
   * spread: filter cross compilation tests for autotools

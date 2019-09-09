@@ -1,0 +1,56 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the snapcraft package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: snapcraft\n"
+"Report-Msgid-Bugs-To: snapcraft@packages.debian.org\n"
+"POT-Creation-Date: 2019-09-10 15:31+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. Type: select
+#. Description
+#: ../snapcraft.templates:1001
+msgid "Unable to reach the snap store"
+msgstr ""
+
+#. Type: select
+#. Description
+#: ../snapcraft.templates:1001
+msgid ""
+"Your system is unable to reach the snap store, please make sure you're "
+"connected to the Internet and update any firewall or proxy settings as "
+"needed so that you can reach the snap store."
+msgstr ""
+
+#. Type: select
+#. Description
+#: ../snapcraft.templates:1001
+msgid ""
+"You can manually check for connectivity by running \"snap info snapcraft\""
+msgstr ""
+
+#. Type: select
+#. Description
+#: ../snapcraft.templates:1001
+msgid ""
+"Aborting will cause the upgrade to fail and will require it to be re-"
+"attempted once snapd is functional on the system."
+msgstr ""
+
+#. Type: select
+#. Description
+#: ../snapcraft.templates:1001
+msgid ""
+"Skipping will let the package upgrade continue but the Snapcraft commands "
+"will not be functional until the Snapcraft snap is installed."
+msgstr ""
