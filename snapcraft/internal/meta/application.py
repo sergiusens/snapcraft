@@ -16,7 +16,7 @@
 
 import os
 from copy import deepcopy
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from . import errors
 from ._utils import _executable_is_valid
@@ -146,3 +146,16 @@ class Application:
         self._fix_sockets()
 
         return self._app_properties
+
+    def get_warnings(self) -> List[str]:
+        warnings: List[str] = list()
+
+        for command_entry, command in self._commands.items():
+            for warning in command.get_warnings():
+                warnings.append(
+                    warning.format(
+                        command_entry=command_entry, application=self._app_name
+                    )
+                )
+
+        return warnings

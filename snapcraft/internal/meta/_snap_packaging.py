@@ -581,6 +581,11 @@ class _SnapPackaging:
                     set(snap_yaml.get("assumes", list())) | assumes
                 )
 
+            # Check if there are any warnings.
+            for application in self._apps.values():
+                for warning in application.get_warnings():
+                    logger.warning(warning)
+
         self._process_passthrough_properties(snap_yaml)
 
         return snap_yaml

@@ -16,6 +16,7 @@
 
 import contextlib
 import os
+import logging
 import re
 import shlex
 import shutil
@@ -25,7 +26,8 @@ from . import errors
 from ._utils import _executable_is_valid
 from snapcraft.internal import common
 
-_COMMAND_PATTERN = re.compile("^[A-Za-z0-9. _#:$-][A-Za-z0-9/. _#:$-]*$")
+_COMMAND_PATTERN_REGEX = r"^[A-Za-z0-9. _#:$-][A-Za-z0-9/. _#:$-]*$"
+_COMMAND_PATTERN = re.compile(_COMMAND_PATTERN_REGEX)
 
 
 def _get_shebang_from_file(file_path: str) -> List[str]:
@@ -169,6 +171,29 @@ class Command:
         return "{command_name}-{app_name}.wrapper".format(
             command_name=self._command_name, app_name=self._app_name
         )
+
+    def get_warnings(self) -> List[str]:
+        warnings: List[str] = list()
+        if self._command != self._original_command:
+            warnings.append(
+                "Consider updating {{command_entry!r}} in {{application!r}} from {!r} to {!r}.".format(
+                    self._original_command, self._command
+                )
+            )
+        if self._command.startswith("/"):
+            warnings.append(
+                "A shell wrapper is required for {{command_entry!r}} in {{application!r}} as "
+                "a path not contained in the prime directory has been defined.".format(
+                    self._original_command, self._command
+                )
+            )
+        elif self._generate_wrapper:
+            warnings.append(
+                "A shell wrapper is required for {command_entry!r} in {application!r} "
+                "as commands accepted by snapd must only contain alphanumeric characters, "
+                "spaces, and the following special characters: / . _ # : $ -"
+            )
+        return warnings
 
     def get_command(self) -> Optional[str]:
         # Verify that command matches a valid snapd pattern.
